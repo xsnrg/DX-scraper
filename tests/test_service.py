@@ -99,3 +99,120 @@ class TestDXPeditionService:
             assert summary.active_stations == 1
             assert len(summary.stations) == 1
             assert summary.stations[0].callsign == "TEST1"
+
+    @pytest.mark.asyncio
+    async def test_get_current_data_with_staleness_exception(self, service):
+        from src.exceptions import DataStalenessException
+        
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.side_effect = DataStalenessException("Data is too stale")
+            
+            with pytest.raises(DataStalenessException):
+                await service.get_current_data()
+
+    @pytest.mark.asyncio
+    async def test_get_current_data_with_generic_exception(self, service):
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.side_effect = Exception("Unexpected error")
+            
+            with pytest.raises(Exception):
+                await service.get_current_data()
+
+    @pytest.mark.asyncio
+    async def test_get_current_data_with_max_age_override(self, service):
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.return_value = [
+                DXStation(
+                    callsign="TEST1",
+                    name="Test Station 1",
+                    location="Test",
+                    bands=["20m"],
+                    last_update=datetime.now(timezone.utc),
+                    source="Test"
+                )
+            ]
+            
+            await service.get_current_data(max_age_seconds=7200)
+            assert service.max_age_seconds == 7200
+
+    @pytest.mark.asyncio
+    async def test_get_current_data_empty_stations(self, service):
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.return_value = []
+            
+            summary = await service.get_current_data()
+            assert summary.total_stations == 0
+            assert summary.active_stations == 0
+            assert len(summary.stations) == 0
+            assert summary.data_sources == []
+
+    @pytest.mark.asyncio
+    async def test_get_current_data_with_none_max_age(self, service):
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.return_value = [
+                DXStation(
+                    callsign="TEST1",
+                    name="Test Station 1",
+                    location="Test",
+                    bands=["20m"],
+                    last_update=datetime.now(timezone.utc),
+                    source="Test"
+                )
+            ]
+            
+            summary = await service.get_current_data(max_age_seconds=None)
+            assert summary.total_stations == 1
+
+    def test_filter_by_age_empty_list(self, service):
+        filtered = service.filter_by_age([])
+        assert filtered == []
+
+    def test_deduplicate_stations_empty_list(self, service):
+        deduped = service.deduplicate_stations([])
+        assert deduped == []
+
+    def test_deduplicate_stations_all_duplicates(self, service):
+        now = datetime.now(timezone.utc)
+        duplicate_stations = [
+            DXStation(
+                callsign="SAME1",
+                name="Station 1",
+                location="Loc1",
+                bands=["20m"],
+                last_update=now - timedelta(minutes=10),
+                source="Test"
+            ),
+            DXStation(
+                callsign="SAME1",
+                name="Station 1 Updated",
+                location="Loc1",
+                bands=["20m"],
+                last_update=now - timedelta(minutes=5),
+                source="Test"
+            )
+        ]
+        
+        deduped = service.deduplicate_stations(duplicate_stations)
+        assert len(deduped) == 1
+        assert deduped[0].name == "Station 1 Updated"
+
+    def test_get_active_bands_empty_list(self, service):
+        active = service.get_active_bands([])
+        assert active == []
+
+    def test_get_station_by_callsign_empty_list(self, service):
+        station = service.get_station_by_callsign([], "P49P")
+        assert station is None
+
+    def test_get_station_by_callsign_case_insensitive(self, service, sample_stations):
+        station = service.get_station_by_callsign(sample_stations, "p49p")
+        assert station is not None
+        assert station.callsign == "P49P"
+        
+        station = service.get_station_by_callsign(sample_stations, "vk7zz")
+        assert station is not None
+        assert station.callsign == "VK7ZZ"
+
+    def test_get_station_by_callsign_partial_match(self, service, sample_stations):
+        station = service.get_station_by_callsign(sample_stations, "P49")
+        assert station is None
