@@ -22,3 +22,13 @@ class DXStation(BaseModel):
         if not v.strip():
             raise ValueError("callsign cannot be empty or whitespace only")
         return v
+
+
+class DXDataSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    total_stations: int
+    active_stations: int
+    last_refresh: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
+    data_sources: list[str]
+    stations: list[DXStation]

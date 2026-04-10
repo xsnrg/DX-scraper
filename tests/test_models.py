@@ -8,6 +8,13 @@ class MockObject:
     """Mock object for testing model validation"""
     callsign = "MOCK123"
     name = "Mock Station"
+    location = "Mock Location"
+    bands = ["20m", "40m"]
+    active_band = "20m"
+    active_mode = "SSB"
+    last_update = datetime.now(timezone.utc)
+    source = "test_source"
+    status = "active"
 
 
 class TestDXStation:
