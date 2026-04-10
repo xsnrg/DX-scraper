@@ -42,7 +42,7 @@ class BaseFetcher:
 
     def validate_age(self, last_update: datetime) -> bool:
         max_age = timedelta(seconds=Config.DATA_MAX_AGE_SECONDS)
-        age = datetime.now(timezone.utc) - last_update
+        age = datetime.now(timezone.utc).replace(tzinfo=timezone.utc) - last_update
         if age > max_age:
             raise DataStalenessException(Config.DATA_MAX_AGE_SECONDS, int(age.total_seconds()))
         return True
@@ -122,7 +122,7 @@ class DXSummitFetcher(BaseFetcher):
                 try:
                     last_update = datetime.fromisoformat(spot.get("time", "").replace("Z", "+00:00"))
                 except (ValueError, AttributeError):
-                    last_update = datetime.now(timezone.utc)
+                    last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 
                 if not self.validate_age(last_update):
                     continue
@@ -170,7 +170,7 @@ class DXClusterFetcher(BaseFetcher):
                 try:
                     last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M")
                 except ValueError:
-                    last_update = datetime.now(timezone.utc)
+                    last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 
                 if not self.validate_age(last_update):
                     continue
@@ -218,7 +218,7 @@ class HamQSLFetcher(BaseFetcher):
                 try:
                     last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M")
                 except ValueError:
-                    last_update = datetime.now(timezone.utc)
+                    last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 
                 if not self.validate_age(last_update):
                     continue
@@ -265,9 +265,9 @@ class DXNewsFetcher(BaseFetcher):
                     
                     pub_date = None
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                        pub_date = datetime(*entry.published_parsed[:6])
+                        pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
                     else:
-                        pub_date = datetime.now(timezone.utc)
+                        pub_date = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                     
                     description = entry.description if hasattr(entry, 'description') else ""
                     

@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class DXStation(BaseModel):
@@ -12,16 +12,13 @@ class DXStation(BaseModel):
     bands: list[str] = Field(default_factory=list)
     active_band: Optional[str] = None
     active_mode: Optional[str] = None
-    last_update: datetime
+    last_update: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
     source: str
     status: str = "active"
 
-class DXDataSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    total_stations: int
-    active_stations: int
-    last_refresh: datetime
-    data_sources: list[str]
-    stations: list[DXStation]
-
+    @field_validator("callsign")
+    @classmethod
+    def validate_callsign(cls, v):
+        if not v.strip():
+            raise ValueError("callsign cannot be empty or whitespace only")
+        return v

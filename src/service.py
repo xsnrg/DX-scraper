@@ -54,7 +54,7 @@ class DXPeditionService:
             return DXDataSummary(
                 total_stations=len(stations),
                 active_stations=len([s for s in stations if s.status == "active"]),
-                last_refresh=datetime.now(),
+                last_refresh=datetime.now(timezone.utc).replace(tzinfo=timezone.utc),
                 data_sources=sources,
                 stations=stations
             )
