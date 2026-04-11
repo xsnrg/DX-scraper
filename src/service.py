@@ -15,7 +15,7 @@ class DXPeditionService:
 
     def filter_by_age(self, stations: List[DXStation]) -> List[DXStation]:
         cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=self.max_age_seconds)
-        filtered = [s for s in stations if s.last_update >= cutoff_time]
+        filtered = [s for s in stations if (s.last_update.replace(tzinfo=timezone.utc) if s.last_update.tzinfo is None else s.last_update) >= cutoff_time]
         
         if len(filtered) < len(stations):
             logger.info(f"Filtered {len(stations) - len(filtered)} stations older than {self.max_age_seconds}s")

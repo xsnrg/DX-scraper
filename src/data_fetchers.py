@@ -42,7 +42,9 @@ class BaseFetcher:
 
     def validate_age(self, last_update: datetime) -> bool:
         max_age = timedelta(seconds=Config.DATA_MAX_AGE_SECONDS)
-        age = datetime.now(timezone.utc).replace(tzinfo=timezone.utc) - last_update
+        if last_update.tzinfo is None:
+            last_update = last_update.replace(tzinfo=timezone.utc)
+        age = datetime.now(timezone.utc) - last_update
         if age > max_age:
             raise DataStalenessException(Config.DATA_MAX_AGE_SECONDS, int(age.total_seconds()))
         return True

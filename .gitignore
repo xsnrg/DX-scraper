@@ -3,6 +3,7 @@ node_modules/
 venv/
 __pycache__/
 *.pyc
+**/__pycache__
 
 # Environment variables
 .env
@@ -15,3 +16,4 @@ build/
 # OS generated files
 .DS_Store
 Thumbs.db
+.coverage

@@ -5,9 +5,9 @@ import argparse
 from datetime import datetime
 from typing import Optional
 
-from .models import DXDataSummary
-from .service import DXPeditionService
-from .config import Config
+from src.models import DXDataSummary
+from src.service import DXPeditionService
+from src.config import Config
 
 logging.basicConfig(
     level=logging.INFO,

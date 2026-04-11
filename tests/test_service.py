@@ -105,7 +105,7 @@ class TestDXPeditionService:
         from src.exceptions import DataStalenessException
         
         with patch("src.service.fetch_all_data") as mock_fetch:
-            mock_fetch.side_effect = DataStalenessException("Data is too stale")
+            mock_fetch.side_effect = DataStalenessException(3600, 7200)
             
             with pytest.raises(DataStalenessException):
                 await service.get_current_data()

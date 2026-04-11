@@ -167,7 +167,49 @@ class TestRunWithFilter:
         args.max_age = 3600
         args.source = None
         
-        result = await run_with_filter(args)
+        with patch.object(DXPeditionService, "get_current_data", new_callable=AsyncMock, return_value=mock_summary):
+            result = await run_with_filter(args)
+        
+        assert result.total_stations == 2
+        assert len(result.stations) == 2
+
+    @pytest.mark.asyncio
+    async def test_run_with_filter_no_source(self):
+        """Test run_with_filter without source filter"""
+        station1 = DXStation(
+            callsign="TEST1",
+            name="Test 1",
+            location="Loc 1",
+            bands=[],
+            last_update=datetime.now(timezone.utc),
+            source="source1",
+            status="active"
+        )
+        station2 = DXStation(
+            callsign="TEST2",
+            name="Test 2",
+            location="Loc 2",
+            bands=[],
+            last_update=datetime.now(timezone.utc),
+            source="source2",
+            status="active"
+        )
+        
+        mock_summary = DXDataSummary(
+            total_stations=2,
+            active_stations=2,
+            last_refresh=datetime.now(timezone.utc),
+            data_sources=["source1", "source2"],
+            stations=[station1, station2]
+        )
+        
+        args = MagicMock()
+        args.max_age = 3600
+        args.source = None
+        
+        with patch.object(DXPeditionService, '__init__', return_value=None):
+            with patch.object(DXPeditionService, "get_current_data", new_callable=AsyncMock, return_value=mock_summary):
+                result = await run_with_filter(args)
         
         assert result.total_stations == 2
         assert len(result.stations) == 2
@@ -232,6 +274,6 @@ class TestMainEntry:
         with patch('sys.argv', ['script_name', '--max-age', '1800', '--format', 'json']):
             with patch.object(DXPeditionService, '__init__', return_value=None):
                 with patch.object(DXPeditionService, 'get_current_data', new_callable=AsyncMock, return_value=mock_summary):
-                    with patch('main.main', new_callable=AsyncMock) as mock_main:
+                    with patch('src.main.main', new_callable=AsyncMock) as mock_main:
                         await main_entry()
                         mock_main.assert_called_once_with(1800, 'json')
