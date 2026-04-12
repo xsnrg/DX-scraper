@@ -21,11 +21,6 @@ class Config:
             "url": "https://www.dxcluster.net/",
             "polling_interval": 600
         },
-        "hamqsl": {
-            "enabled": os.getenv("DXPDX_HAMQSL_ENABLED", "true").lower() == "true",
-            "url": "https://www.hamqsl.com/sq700.php",
-            "polling_interval": 900
-        },
         "dxnews": {
             "enabled": os.getenv("DXPDX_NEWS_ENABLED", "true").lower() == "true",
             "url": "https://dxnews.com/rss.xml",

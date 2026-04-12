@@ -48,6 +48,21 @@ class TestBaseFetcher:
                 await base_fetcher.fetch_with_retry("http://test.com")
 
     @pytest.mark.asyncio
+    async def test_fetch_with_retry_http_errors(self, mock_session, base_fetcher):
+        """Test fetch_with_retry with 400 and 404 errors"""
+        for status_code in [400, 404]:
+            mock_response = AsyncMock()
+            mock_response.status = status_code
+            
+            mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            with patch('asyncio.sleep', new_callable=AsyncMock):
+                with pytest.raises(DataSourceError) as excinfo:
+                    await base_fetcher.fetch_with_retry("http://test.com")
+                assert f"Failed after {base_fetcher.retry_attempts} attempts" in str(excinfo.value)
+
+    @pytest.mark.asyncio
     async def test_validate_age_valid(self, base_fetcher):
         last_update = datetime.now(timezone.utc) - timedelta(seconds=100)
         assert base_fetcher.validate_age(last_update) is True
