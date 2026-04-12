@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXpedition Monitor</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [v-cloak] { display: none; }
+        .sort-asc::after { content: ' ↑'; }
+        .sort-desc::after { content: ' ↓'; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+    <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
+        <!-- Header Section -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400 flex items-center gap-3">
+                    <i class="fas fa-broadcast-tower"></i> DXpedition Monitor
+                </h1>
+                <p class="text-slate-400 mt-1">Real-time tracking of active DX expeditions</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button @click="fetchData" :disabled="loading" 
+                        class="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                    <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
+                    {{ loading ? 'Updating...' : 'Refresh Data' }}
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <div v-if="summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                <div class="text-slate-400 text-sm uppercase font-semibold">Total Stations</div>
+                <div class="text-2xl font-bold">{{ summary.total_stations }}</div>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                <div class="text-slate-400 text-sm uppercase font-semibold">Active Now</div>
+                <div class="text-2xl font-bold text-green-400">{{ summary.active_stations }}</div>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                <div class="text-slate-400 text-sm uppercase font-semibold">Last Refresh</div>
+                <div class="text-2xl font-bold text-blue-300">{{ formatDate(summary.last_refresh) }}</div>
+            </div>
+        </div>
+
+        <!-- Controls Bar -->
+        <div v-if="summary" class="bg-slate-800 p-4 rounded-t-xl border-x border-t border-slate-700 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="relative w-full md:w-96">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                <input v-model="searchQuery" type="text" placeholder="Search callsign, name or location..." 
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            </div>
+            
+            <div class="flex items-center gap-4 w-full md:w-auto">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-slate-400">Rows:</label>
+                    <select v-model="pageSize" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 focus:outline-none">
+                        <option :value="10">10</option>
+                        <option :value="25">25</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div v-if="summary" class="bg-slate-800 border border-slate-700 rounded-b-xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-700/50 text-slate-300 text-sm uppercase">
+                            <th v-for="col in columns" :key="col.key" 
+                                @click="setSort(col.key)"
+                                class="px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors"
+                                :class="{'text-blue-400 font-bold': sortKey === col.key, 'sort-asc': sortKey === col.key && sortOrder === 1, 'sort-desc': sortKey === col.key && sortOrder === -1}">
+                                {{ col.label }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        <tr v-for="station in paginatedStations" :key="station.callsign" class="hover:bg-slate-700/30 transition-colors">
+                            <td class="px-6 py-4 font-mono font-bold text-blue-300">{{ station.callsign }}</td>
+                            <td class="px-6 py-4">{{ station.name }}</td>
+                            <td class="px-6 py-4">{{ station.location }}</td>
+                            <td class="px-6 py-4">
+                                <div class="flex flex-wrap gap-1">
+                                    <span v-for="band in station.bands" :key="band" 
+                                          class="text-xs bg-slate-900 text-slate-300 px-2 py-1 rounded border border-slate-600">
+                                        {{ band }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span v-if="station.active_band" class="text-sm font-medium text-green-400">
+                                    {{ station.active_band }} ({{ station.active_mode }})
+                                </span>
+                                <span v-else class="text-slate-500 text-sm italic">Idle</span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-400">{{ formatDate(station.last_update) }}</td>
+                            <td class="px-6 py-4">
+                                <span class="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded-full border border-blue-700/50">
+                                    {{ station.source }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr v-if="filteredStations.length === 0">
+                            <td colspan="7" class="px-6 py-12 text-center text-slate-500 italic">
+                                No stations found matching your criteria.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="px-6 py-4 bg-slate-700/30 border-t border-slate-700 flex items-center justify-between">
+                <div class="text-sm text-slate-400">
+                    Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, filteredStations.length) }} of {{ filteredStations.length }} entries
+                </div>
+                <div class="flex gap-2">
+                    <button @click="currentPage--" :disabled="currentPage === 1" 
+                            class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Previous
+                    </button>
+                    <button @click="currentPage++" :disabled="currentPage * pageSize >= filteredStations.length" 
+                            class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loading && !summary" class="flex flex-col items-center justify-center py-20">
+            <i class="fas fa-circle-notch fa-spin text-4xl text-blue-500 mb-4"></i>
+            <p class="text-slate-400">Fetching DX data...</p>
+        </div>
+
+        <!-- Error State -->
+        <div v-if="error" class="bg-red-900/20 border border-red-500/50 text-red-400 p-4 rounded-xl flex items-center gap-3">
+            <i class="fas fa-exclamation-triangle"></i>
+            {{ error }}
+            <button @click="fetchData" class="ml-auto underline font-bold">Retry</button>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const summary = ref(null);
+                const loading = ref(false);
+                const error = ref(null);
+                const searchQuery = ref('');
+                const sortKey = ref('callsign');
+                const sortOrder = ref(1); // 1 for asc, -1 for desc
+                const pageSize = ref(25);
+                const currentPage = ref(1);
+
+                const columns = [
+                    { key: 'callsign', label: 'Callsign' },
+                    { key: 'name', label: 'Name' },
+                    { key: 'location', label: 'Location' },
+                    { key: 'bands', label: 'Bands' },
+                    { key: 'active_band', label: 'Active' },
+                    { key: 'last_update', label: 'Updated' },
+                    { key: 'source', label: 'Source' },
+                ];
+
+                const fetchData = async () => {
+                    loading.value = true;
+                    error.value = null;
+                    try {
+                        const response = await fetch('/data');
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        summary.value = await response.json();
+                    } catch (e) {
+                        error.value = `Failed to load data: ${e.message}. Ensure the API is running.`;
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const setSort = (key) => {
+                    if (sortKey.value === key) {
+                        sortOrder.value *= -1;
+                    } else {
+                        sortKey.value = key;
+                        sortOrder.value = 1;
+                    }
+                };
+
+                const filteredStations = computed(() => {
+                    if (!summary.value) return [];
+                    
+                    let data = [...summary.value.stations];
+
+                    // Search
+                    if (searchQuery.value) {
+                        const q = searchQuery.value.toLowerCase();
+                        data = data.filter(s => 
+                            s.callsign.toLowerCase().includes(q) || 
+                            s.name.toLowerCase().includes(q) || 
+                            s.location.toLowerCase().includes(q)
+                        );
+                    }
+
+                    // Sort
+                    data.sort((a, b) => {
+                        let valA = a[sortKey.value];
+                        let valB = b[sortKey.value];
+
+                        // Handle arrays (bands)
+                        if (Array.isArray(valA)) valA = valA.join(', ');
+                        if (Array.isArray(valB)) valB = valB.join(', ');
+                        
+                        // Handle nulls
+                        if (valA === null || valA === undefined) valA = '';
+                        if (valB === null || valB === undefined) valB = '';
+
+                        if (valA < valB) return -1 * sortOrder.value;
+                        if (valA > valB) return 1 * sortOrder.value;
+                        return 0;
+                    });
+
+                    return data;
+                });
+
+                const paginatedStations = computed(() => {
+                    const start = (currentPage.value - 1) * pageSize.value;
+                    return filteredStations.value.slice(start, start + pageSize.value);
+                });
+
+                const formatDate = (dateStr) => {
+                    if (!dateStr) return 'N/A';
+                    const date = new Date(dateStr);
+                    return date.toLocaleString();
+                };
+
+                onMounted(fetchData);
+
+                return {
+                    summary, loading, error, searchQuery, 
+                    sortKey, sortOrder, pageSize, currentPage,
+                    columns, filteredStations, paginatedStations,
+                    fetchData, setSort, formatDate
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
