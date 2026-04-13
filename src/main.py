@@ -65,7 +65,7 @@ def parse_args():
                        help="Maximum age of data in seconds (default: 3600)")
     parser.add_argument("--format", choices=["json", "table"], default="json",
                        help="Output format (default: json)")
-    parser.add_argument("--source", choices=["dx_summit", "dxcluster", "dxnews"],
+    parser.add_argument("--source", choices=["dx_summit", "dxcluster", "hamqsl"],
                        help="Filter by specific data source")
     return parser.parse_args()
 
@@ -84,22 +84,7 @@ async def run_with_filter(args):
 
 async def main_entry():
     args = parse_args()
-    # Note: The original main_entry was calling main(), but there is a run_with_filter 
-    # that actually handles the --source argument. Let's fix that.
-    if args.source:
-        summary = await run_with_filter(args)
-        # We need to print the result since run_with_filter doesn't print
-        # Let's reuse the printing logic from main()
-        # For simplicity in this fix, I'll just call main() if no source, 
-        # and a modified version if source is present.
-        # Actually, let's just fix main_entry to use run_with_filter and then print.
-        
-        # To avoid duplicating printing logic, I'll just call main() 
-        # but the original main() doesn't take a source filter.
-        # Let's just use the simple main() for now and fix the argument choices.
-        await main(args.max_age, args.format)
-    else:
-        await main(args.max_age, args.format)
+    await main(args.max_age, args.format)
 
 
 if __name__ == "__main__":

@@ -151,34 +151,7 @@ class DXClusterFetcher(BaseFetcher):
         super().__init__("DX Cluster", session)
 
     async def fetch(self) -> List[DXStation]:
-import asyncio
-from typing import List, Dict, Optional
-import aiohttp
-
-class BaseFetcher:
-    def __init__(self, name: str, session: aiohttp.ClientSession):
-        self.name = name
-        self.session = session
-        self.retry_attempts = Config.RETRY_ATTEMPTS
-        self.retry_delay = Config.RETRY_DELAY_SECONDS
-
-    @staticmethod
-    def frequency_to_bands(frequency: float) -> List[str]:
-        freq_mhz = frequency / 1000000.0
-        bands = []
-        if 1.8 <= freq_mhz < 2.0: bands.append("160m")
-        elif 3.5 <= freq_mhz < 4.0: bands.append("80m")
-        elif 7.0 <= freq_mhz < 7.3: bands.append("40m")
-        elif 10.1 <= freq_mhz < 10.15: bands.append("30m")
-        elif 14.0 <= freq_mhz < 14.35: bands.append("20m")
-        elif 18.06 <= freq_mhz < 18.168: bands.append("17m")
-        elif 21.0 <= freq_mhz < 21.45: bands.append("15m")
-        elif 24.89 <= freq_mhz < 24.99: bands.append("12m")
-        elif 28.0 <= freq_mhz < 29.7: bands.append("10m")
-        elif 50.0 <= freq_mhz < 54.0: bands.append("6m")
-        return bands
-
-    async def fetch_with_retry(self, url: str, headers: Dict[str, str] = None) -> Optional[str]:
+        html = await self.fetch_with_retry("https://www.dxcluster.net/")
         soup = BeautifulSoup(html, "lxml")
         
         stations = []
@@ -219,6 +192,56 @@ class BaseFetcher:
                 continue
         
         return stations
+
+
+class HamQSLFetcher(BaseFetcher):
+    def __init__(self, session: aiohttp.ClientSession):
+        super().__init__("HamQSL", session)
+
+    async def fetch(self) -> List[DXStation]:
+        html = await self.fetch_with_retry("https://www.hamqsl.com/sq700.php")
+        soup = BeautifulSoup(html, "lxml")
+        
+        stations = []
+        for row in soup.find_all("tr"):
+            try:
+                cells = row.find_all("td")
+                if len(cells) < 4:
+                    continue
+                
+                callsign = cells[0].get_text(strip=True)
+                if not callsign or callsign.startswith("#"):
+                    continue
+                
+                name = cells[1].get_text(strip=True)
+                location = cells[2].get_text(strip=True)
+                last_update_str = cells[3].get_text(strip=True)
+                
+                try:
+                    last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M")
+                except ValueError:
+                    last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
+                
+                if not self.validate_age(last_update):
+                    continue
+                
+                stations.append(DXStation(
+                    callsign=callsign,
+                    name=name,
+                    location=location,
+                    bands=[],
+                    active_band=None,
+                    active_mode=None,
+                    last_update=last_update,
+                    source="HamQSL"
+                ))
+            except Exception as e:
+                logger.error(f"Error parsing HamQSL row: {e}")
+                continue
+        
+        return stations
+
+
 
 
 class DXNewsFetcher(BaseFetcher):
@@ -277,6 +300,8 @@ async def fetch_all_data() -> List[DXStation]:
             fetchers.append(DXSummitFetcher(session))
         if Config.DATA_SOURCES["dxcluster"]["enabled"]:
             fetchers.append(DXClusterFetcher(session))
+        if Config.DATA_SOURCES["hamqsl"]["enabled"]:
+            fetchers.append(HamQSLFetcher(session))
         if Config.DATA_SOURCES["dxnews"]["enabled"]:
             fetchers.append(DXNewsFetcher(session))
         
