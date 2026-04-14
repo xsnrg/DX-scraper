@@ -50,9 +50,9 @@
 
         <!-- Controls Bar -->
         <div v-if="summary" class="bg-slate-800 p-4 rounded-t-xl border-x border-t border-slate-700 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div class="relative w-full md:w-96">
+            <div class="relative w-full md:w-[30rem]">
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
-                <input v-model="searchQuery" type="text" placeholder="Search callsign, name or location..." 
+                <input v-model="searchQuery" type="text" placeholder="Search callsign, name, location or frequency..." 
                        class="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
             </div>
             
@@ -107,8 +107,8 @@
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-400">{{ formatDate(station.last_update) }}</td>
                             <td class="px-6 py-4">
-                                <span class="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded-full border border-blue-700/50">
-                                    {{ station.source }}
+                                <span class="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded-full border border-blue-700/50 whitespace-nowrap">
+                                     {{ station.source }}
                                 </span>
                             </td>
                         </tr>
@@ -162,8 +162,8 @@
                 const loading = ref(false);
                 const error = ref(null);
                 const searchQuery = ref('');
-                const sortKey = ref('callsign');
-                const sortOrder = ref(1);
+                const sortKey = ref('last_update');
+                const sortOrder = ref(-1);
                 const pageSize = ref(25);
                 const currentPage = ref(1);
 
@@ -209,7 +209,8 @@
                         data = data.filter(s => 
                             s.callsign.toLowerCase().includes(q) || 
                             s.name.toLowerCase().includes(q) || 
-                            s.location.toLowerCase().includes(q)
+                            s.location.toLowerCase().includes(q) ||
+                            (s.frequency && s.frequency.toString().toLowerCase().includes(q))
                         );
                     }
                     data.sort((a, b) => {
@@ -234,7 +235,7 @@
                 const formatDate = (dateStr) => {
                     if (!dateStr) return 'N/A';
                     const date = new Date(dateStr);
-                    return date.toLocaleString();
+                    return date.toLocaleString(undefined, { hour12: false });
                 };
 
                 onMounted(fetchData);

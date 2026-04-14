@@ -8,7 +8,6 @@ from src.data_fetchers import (
     BaseFetcher,
     DXSummitFetcher,
     DXClusterFetcher,
-    HamQSLFetcher,
     DXNewsFetcher,
     fetch_all_data
 )
@@ -190,42 +189,6 @@ class TestDXClusterFetcher:
         assert stations[0].callsign == "XY9ZZ"
 
 
-class TestHamQSLFetcher:
-    @pytest.fixture
-    def mock_session(self):
-        return MagicMock(spec=aiohttp.ClientSession)
-
-    @pytest.fixture
-    def fetcher(self, mock_session):
-        return HamQSLFetcher(mock_session)
-
-    @pytest.mark.asyncio
-    async def test_fetch_successful(self, fetcher, mock_session):
-        html_content = """
-        <html>
-            <tr>
-                <td>K1ABC</td>
-                <td>QSL Station</td>
-                <td>USA</td>
-                <td>2025-01-09 10:30 12:00</td>
-            </tr>
-        </html>
-        """
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text = AsyncMock(return_value=html_content)
-        
-        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
-
-        stations = await fetcher.fetch()
-
-        assert len(stations) == 1
-        assert stations[0].callsign == "K1ABC"
-        assert stations[0].source == "HamQSL"
-        assert stations[0].status == "active"
-
-
 class TestFetchAllData:
     @pytest.mark.asyncio
     async def test_fetch_all_data_success(self, mocker):
@@ -243,13 +206,11 @@ class TestFetchAllData:
         
         mocker.patch('src.data_fetchers.DXSummitFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.DXClusterFetcher', return_value=mock_fetcher)
-        mocker.patch('src.data_fetchers.HamQSLFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.DXNewsFetcher', return_value=mock_fetcher)
         
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
             "dxcluster": {"enabled": True},
-            "hamqsl": {"enabled": True},
             "dxnews": {"enabled": True}
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
@@ -259,7 +220,7 @@ class TestFetchAllData:
                 
                 stations = await fetch_all_data()
 
-                assert len(stations) == 4
+                assert len(stations) == 3
                 assert all(s.source == "Test" for s in stations)
 
     @pytest.mark.asyncio
@@ -273,7 +234,6 @@ class TestFetchAllData:
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
             "dxcluster": {"enabled": False},
-            "hamqsl": {"enabled": False},
             "dxnews": {"enabled": False}
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
@@ -290,7 +250,6 @@ class TestFetchAllData:
         mocker.patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": False},
             "dxcluster": {"enabled": False},
-            "hamqsl": {"enabled": False},
             "dxnews": {"enabled": False}
         })
         

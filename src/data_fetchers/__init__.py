@@ -5,7 +5,6 @@ from typing import List
 
 from .dx_summit import DXSummitFetcher
 from .dx_cluster import DXClusterFetcher
-from .hamqsl import HamQSLFetcher
 from .dx_news import DXNewsFetcher
 from .base import BaseFetcher
 from ..models import DXStation
@@ -21,11 +20,8 @@ async def fetch_all_data() -> List[DXStation]:
             fetchers.append(DXSummitFetcher(session))
         if Config.DATA_SOURCES["dxcluster"]["enabled"]:
             fetchers.append(DXClusterFetcher(session))
-        if Config.DATA_SOURCES["hamqsl"]["enabled"]:
-            fetchers.append(HamQSLFetcher(session))
         if Config.DATA_SOURCES["dxnews"]["enabled"]:
             fetchers.append(DXNewsFetcher(session))
-        
         all_stations = []
         tasks = [fetcher.fetch() for fetcher in fetchers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
