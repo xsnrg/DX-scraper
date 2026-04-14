@@ -33,4 +33,4 @@ class DXDataSummary(BaseModel):
     last_refresh: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
     data_sources: list[str]
     stations: list[DXStation]
-
+    
