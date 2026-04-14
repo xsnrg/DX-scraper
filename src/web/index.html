@@ -25,7 +25,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <button @click="fetchData" :disabled="loading" 
-                        class="bg-blue-60im6 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
                     <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
                     {{ loading ? 'Updating...' : 'Refresh Data' }}
                 </button>
@@ -39,7 +39,7 @@
                 <div class="text-2xl font-bold">{{ summary.total_stations }}</div>
             </div>
             <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
-                <div class="text-slate-400 text-sm uppercase fontsemibold">Active Now</div>
+                <div class="text-slate-400 text-sm uppercase font-semibold">Active Now</div>
                 <div class="text-2xl font-bold text-green-400">{{ summary.active_stations }}</div>
             </div>
             <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
@@ -57,7 +57,7 @@
             </div>
             
             <div class="flex items-center gap-4 w-full md:w-auto">
-                <div class="flex items		items-center gap-2">
+                <div class="flex items-center gap-2">
                     <label class="text-sm text-slate-400">Rows:</label>
                     <select v-model="pageSize" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 focus:outline-none">
                         <option :value="10">10</option>
@@ -74,7 +74,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="bg-slate-70_50 text-slate-300 text-sm uppercase">
+                        <tr class="bg-slate-700/50 text-slate-300 text-sm uppercase">
                             <th v-for="col in columns" :key="col.key" 
                                 @click="setSort(col.key)"
                                 class="px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors"
@@ -164,7 +164,7 @@
                 const searchQuery = ref('');
                 const sortKey = ref('callsign');
                 const sortOrder = ref(1);
-                const pageSize = ref(2padgeSize);
+                const pageSize = ref(25);
                 const currentPage = ref(1);
 
                 const columns = [
