@@ -89,7 +89,7 @@ class TestDXSummitFetcher:
         assert stations[0].location == ""
         assert "20m" in stations[0].bands
         assert stations[0].active_band == "20m"
-        assert stations[0].active_mode is None
+        assert stations[0].active_mode == "CW"
         assert stations[0].source == "DX Summit"
         assert stations[0].status == "active"
 

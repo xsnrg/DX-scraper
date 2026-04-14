@@ -276,4 +276,4 @@ class TestMainEntry:
                 with patch.object(DXPeditionService, 'get_current_data', new_callable=AsyncMock, return_value=mock_summary):
                     with patch('src.main.main', new_callable=AsyncMock) as mock_main:
                         await main_entry()
-                        mock_main.assert_called_once_with(1800, 'json')
+                        mock_main.assert_called_once_with(1800, 'json', source=None)

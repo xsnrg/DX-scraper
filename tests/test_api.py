@@ -8,8 +8,8 @@ def test_root():
     """Test the root endpoint."""
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "DXpedition Monitor API"}
-
+    # The root endpoint serves the index.html file, not a JSON response
+    assert "DXpedition Monitor" in response.text
 def test_get_data():
     """Test the /data endpoint."""
     response = client.get("/data")

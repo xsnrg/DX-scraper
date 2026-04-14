@@ -16,12 +16,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def main(max_age_seconds: Optional[int] = None, output_format: str = "json"):
+async def main(max_age_seconds: Optional[int] = None, output_format: str = "json", source: Optional[str] = None):
     service = DXPeditionService(max_age_seconds or Config.DATA_MAX_AGE_SECONDS)
     
     try:
         summary = await service.get_current_data(max_age_seconds)
         
+        if source:
+            summary.stations = [s for s in summary.stations if s.source == source]
+            summary.total_stations = len(summary.stations)
+            summary.active_stations = len([s for s in summary.stations if s.status == "active"])
+            summary.data_sources = list(set(s.source for s in summary.stations))
+
         if output_format == "json":
             output = {
                 "total_stations": summary.total_stations,
@@ -33,6 +39,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
                         "callsign": s.callsign,
                         "name": s.name,
                         "location": s.location,
+                        "frequency": s.frequency,
                         "bands": s.bands,
                         "active_band": s.active_band,
                         "active_mode": s.active_mode,
@@ -45,11 +52,12 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
             }
             print(json.dumps(output, indent=2))
         elif output_format == "table":
-            print(f"{'Callsign':<10} {'Name':<30} {'Location':<20} {'Bands':<30} {'Last Update'}")
-            print("-" * 110)
+            print(f"{'Callsign':<10} {'Name':<30} {'Location':<20} {'Bands':<30} {'Frequency':<15} {'Last Update'}")
+            print("-" * 125)
             for station in summary.stations:
-                bands_str = ", ".join(station.bands[:3]) if station.bands else "N/A"
-                print(f"{station.callsign:<10} {station.name:<30} {station.location:<20} {bands_str:<30} {station.last_update.strftime('%Y-%m-%d %H:%M')}")
+                bands_str = ", ".join(station.bands[:3]) if station.bands else ""
+                freq_str = f"{station.frequency:.4f} MHz" if station.frequency else ""
+                print(f"{station.callsign:<10} {station.name:<30} {station.location:<20} {bands_str:<30} {freq_str:<15} {station.last_update.strftime('%Y-%m-%d %H:%M')}")
         else:
             print(f"Unknown format: {output_format}")
         
@@ -59,33 +67,33 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
         raise
 
 
+async def run_with_filter(args):
+    service = DXPeditionService(args.max_age or Config.DATA_MAX_AGE_SECONDS)
+    summary = await service.get_current_data(args.max_age)
+    if args.source:
+        summary.stations = [s for s in summary.stations if s.source == args.source]
+        summary.total_stations = len(summary.stations)
+        summary.active_stations = len([s for s in summary.stations if s.status == "active"])
+        summary.data_sources = list(set(s.source for s in summary.stations))
+    return summary
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Monitor DXpedition teams")
     parser.add_argument("--max-age", type=int, default=3600,
                        help="Maximum age of data in seconds (default: 3600)")
     parser.add_argument("--format", choices=["json", "table"], default="json",
                        help="Output format (default: json)")
-    parser.add_argument("--source", choices=["dx_summit", "dxcluster", "hamqsl"],
+    parser.add_argument("--source", choices=["dx_summit", "dxcluster"],
                        help="Filter by specific data source")
     return parser.parse_args()
 
 
-async def run_with_filter(args):
-    service = DXPeditionService(args.max_age)
-    summary = await service.get_current_data(args.max_age)
-    
-    if args.source:
-        filtered = [s for s in summary.stations if s.source == args.source]
-        summary.stations = filtered
-        summary.total_stations = len(filtered)
-    
-    return summary
-
-
 async def main_entry():
     args = parse_args()
-    await main(args.max_age, args.format)
+    await main(args.max_age, args.format, source=args.source)
 
 
 if __name__ == "__main__":
     asyncio.run(main_entry())
+

@@ -9,6 +9,7 @@ class DXStation(BaseModel):
     callsign: str
     name: str
     location: str
+    frequency: Optional[float] = None
     bands: list[str] = Field(default_factory=list)
     active_band: Optional[str] = None
     active_mode: Optional[str] = None
@@ -32,3 +33,4 @@ class DXDataSummary(BaseModel):
     last_refresh: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
     data_sources: list[str]
     stations: list[DXStation]
+
