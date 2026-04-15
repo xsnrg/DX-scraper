@@ -22,11 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_all_data(session: aiohttp.ClientSession) -> List[DXStation]:
+    enabled_sources = Config.get_enabled_sources()
+    fetchers_map = {
+        "dx_cluster": DXClusterFetcher,
+        "dx_news": DXNewsFetcher,
+        "dx_summit": DXSummitFetcher,
+        "hamqth": HamQTHFetcher,
+    }
+
     fetchers = [
-        DXClusterFetcher(session),
-        DXNewsFetcher(session),
-        DXSummitFetcher(session),
-        HamQTHFetcher(session),
+        fetchers_map[source](session)
+        for source in enabled_sources
     ]
     all_stations = []
     tasks = [fetcher.fetch() for fetcher in fetchers]

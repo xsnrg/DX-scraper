@@ -211,8 +211,8 @@ class TestFetchAllData:
         
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
-            "dxcluster": {"enabled": True},
-            "dxnews": {"enabled": True},
+            "dx_cluster": {"enabled": True},
+            "dx_news": {"enabled": True},
             "hamqth": {"enabled": True}
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
@@ -238,8 +238,8 @@ class TestFetchAllData:
         
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
-            "dxcluster": {"enabled": False},
-            "dxnews": {"enabled": False},
+            "dx_cluster": {"enabled": False},
+            "dx_news": {"enabled": False},
             "hamqth": {"enabled": False}
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
@@ -255,8 +255,8 @@ class TestFetchAllData:
     async def test_fetch_all_data_disabled_sources(self, mocker):
         mocker.patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": False},
-            "dxcluster": {"enabled": False},
-            "dxnews": {"enabled": False}
+            "dx_cluster": {"enabled": False},
+            "dx_news": {"enabled": False}
         })
         
         with patch('aiohttp.ClientSession') as mock_session_class:
