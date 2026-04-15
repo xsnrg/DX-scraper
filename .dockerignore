@@ -9,3 +9,5 @@ __pycache__/
 tests/
 PRODUCT_STRUCTURE.md
 pytest.ini
+.continue
+.playwright-mcp
