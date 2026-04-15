@@ -85,7 +85,11 @@
                     </thead>
                     <tbody class="divide-y divide-slate-700">
                         <tr v-for="station in paginatedStations" :key="station.callsign" class="hover:bg-slate-700/30 transition-colors">
-                            <td class="px-6 py-4 font-mono font-bold text-blue-300">{{ station.callsign }}</td>
+                            <td class="px-6 py-4 font-mono font-bold text-blue-300">
+                                <a :href="`https://www.qrz.com/db/${station.callsign}`" target="_blank" class="hover:text-blue-400 hover:underline transition-colors">
+                                    {{ station.callsign }}
+                                </a>
+                            </td>
                             <td class="px-6 py-4">{{ station.name }}</td>
                             <td class="px-6 py-4">{{ station.location }}</td>
                             <td class="px-6 py-4">
