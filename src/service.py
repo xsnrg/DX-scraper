@@ -1,4 +1,5 @@
 import logging
+import aiohttp
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -15,7 +16,7 @@ class DXPeditionService:
 
     def filter_by_age(self, stations: List[DXStation]) -> List[DXStation]:
         cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=self.max_age_seconds)
-        filtered = [s for s in stations if (s.last_update.replace(tzinfo=timezone.utc) if s.last_update.tzinfo is None else s.last_update) >= cutoff_time]
+        filtered = [s for s in stations if self._normalize_datetime(s.last_update) >= cutoff_time]
         
         if len(filtered) < len(stations):
             logger.info(f"Filtered {len(stations) - len(filtered)} stations older than {self.max_age_seconds}s")
@@ -29,10 +30,13 @@ class DXPeditionService:
                 seen[station.callsign] = station
             else:
                 existing = seen[station.callsign]
-                if station.last_update > existing.last_update:
+                if self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
                     seen[station.callsign] = station
         
         return list(seen.values())
+
+    def _normalize_datetime(self, dt: datetime) -> datetime:
+        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
     def get_active_bands(self, stations: List[DXStation]) -> List[DXStation]:
         active = [s for s in stations if s.status == "active"]
@@ -44,7 +48,9 @@ class DXPeditionService:
             self.max_age_seconds = max_age_seconds
         
         try:
-            stations = await fetch_all_data()
+            async with aiohttp.ClientSession() as session:
+                stations = await fetch_all_data(session)
+
             stations = self.filter_by_age(stations)
             stations = self.deduplicate_stations(stations)
             stations = self.get_active_bands(stations)
@@ -70,3 +76,4 @@ class DXPeditionService:
             if station.callsign.upper() == callsign.upper():
                 return station
         return None
+

@@ -11,21 +11,10 @@ class Config:
     RETRY_DELAY_SECONDS = float(os.getenv("DXPEDITION_RETRY_DELAY_SECONDS", 1.0))
     
     DATA_SOURCES = {
-        "dx_summit": {
-            "enabled": os.getenv("DXPDX_SUMMIT_ENABLED", "true").lower() == "true",
-            "url": "https://www.dxsummit.fi/summary/summaries.php",
-            "polling_interval": 300
-        },
-        "dxcluster": {
-            "enabled": os.getenv("DXPDX_CLUSTER_ENABLED", "true").lower() == "true",
-            "url": "https://www.dxcluster.net/",
-            "polling_interval": 600
-        },
-        "dxnews": {
-            "enabled": os.getenv("DXPDX_NEWS_ENABLED", "true").lower() == "true",
-            "url": "https://dxnews.com/rss.xml",
-            "polling_interval": 3600
-        }
+        "dx_cluster": "DX Cluster",
+        "dx_news": "DX News",
+        "dx_summit": "DX Summit",
+        "hamqth": "HamQTH DX Cluster",
     }
     @classmethod
     def get_enabled_sources(cls):

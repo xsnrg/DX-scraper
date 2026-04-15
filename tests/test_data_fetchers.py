@@ -207,20 +207,22 @@ class TestFetchAllData:
         mocker.patch('src.data_fetchers.DXSummitFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.DXClusterFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.DXNewsFetcher', return_value=mock_fetcher)
+        mocker.patch('src.data_fetchers.HamQTHFetcher', return_value=mock_fetcher)
         
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
             "dxcluster": {"enabled": True},
-            "dxnews": {"enabled": True}
+            "dxnews": {"enabled": True},
+            "hamqth": {"enabled": True}
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
                 mock_session = AsyncMock()
                 mock_session_class.return_value.__aenter__ = AsyncMock(return_value=mock_session)
                 mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
                 
-                stations = await fetch_all_data()
+                stations = await fetch_all_data(mock_session)
 
-                assert len(stations) == 3
+                assert len(stations) == 4
                 assert all(s.source == "Test" for s in stations)
 
     @pytest.mark.asyncio
@@ -230,18 +232,22 @@ class TestFetchAllData:
         mock_fetcher.fetch = AsyncMock(side_effect=Exception("Fetch failed"))
         
         mocker.patch('src.data_fetchers.DXSummitFetcher', return_value=mock_fetcher)
+        mocker.patch('src.data_fetchers.DXClusterFetcher', return_value=mock_fetcher)
+        mocker.patch('src.data_fetchers.DXNewsFetcher', return_value=mock_fetcher)
+        mocker.patch('src.data_fetchers.HamQTHFetcher', return_value=mock_fetcher)
         
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
             "dxcluster": {"enabled": False},
-            "dxnews": {"enabled": False}
+            "dxnews": {"enabled": False},
+            "hamqth": {"enabled": False}
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
                 mock_session = AsyncMock()
                 mock_session_class.return_value.__aenter__ = AsyncMock(return_value=mock_session)
                 mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
                 
-                stations = await fetch_all_data()
+                stations = await fetch_all_data(mock_session)
                 
                 assert len(stations) == 0
 
@@ -258,6 +264,6 @@ class TestFetchAllData:
             mock_session_class.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
             
-            stations = await fetch_all_data()
+            stations = await fetch_all_data(mock_session)
             
             assert len(stations) == 0

@@ -16,3 +16,5 @@ build/
 Thumbs.db
 .coverage
 
+**/mcpServers
+.playwright-mcp

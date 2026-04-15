@@ -34,7 +34,7 @@ class DXClusterFetcher(BaseFetcher):
                 last_update_str = cells[3].get_text(strip=True)
                 
                 try:
-                    last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M")
+                    last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
                 except ValueError:
                     last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 
@@ -56,3 +56,4 @@ class DXClusterFetcher(BaseFetcher):
                 continue
         
         return stations
+
