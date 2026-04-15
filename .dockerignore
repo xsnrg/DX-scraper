@@ -1,0 +1,11 @@
+
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.env
+.git/
+.gitignore
+tests/
+PRODUCT_STRUCTURE.md
+pytest.ini
