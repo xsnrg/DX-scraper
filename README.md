@@ -1,41 +1,49 @@
 # DXpedition Monitor
 
-A real-time monitoring tool for tracking active DXpeditions across various radio amateur data sources. It aggregates data from multiple sources including DX Summit, DX Cluster, and DX News, providing a unified view of current active stations, their locations, and operating frequencies.
+A real-time monitoring tool for tracking active DXpeditions across various amateur radio data sources. Aggregates data from DX Summit, DX Cluster, DX News, and HamQTH into a unified dashboard with QRZ.com QSO history integration.
 
-## 🚀 Features
+![DXpedition Monitor Dashboard](screenshot.png)
 
-- **Multi-Source Aggregation**: Pulls data from DX Summit, DX Cluster, and other amateur radio feeds.
-- **Real-time Monitoring**: Provides current status of active stations and their target bands/modes.
-- **QRZ QSO Integration**: Import your QRZ.com logbook, filter stations by your QSO history, and highlight matches.
-- **Web Dashboard**: A simple, clean interface to view current DX activity.
-- **REST API**: Easy integration via a FastAPI backend.
-- **CLI Tool**: A command-line interface for quick checks and JSON/Table output.
-- **Flexible Configuration**: Adjustable data staleness thresholds and source enabling/disabling.
+## Features
 
-## 🛠️ Architecture
+- **Multi-Source Aggregation** — Pulls live data from DX Summit, DX Cluster, DX News, and HamQTH
+- **Real-Time Dashboard** — Clean web interface showing active stations, frequencies, and modes
+- **QRZ QSO Integration** — Import your QRZ.com logbook to filter and highlight stations you've contacted
+- **REST API** — FastAPI backend for easy integration with other tools
+- **CLI Tool** — Quick terminal access with JSON or table output
+- **Flexible Configuration** — Adjustable data staleness thresholds, retry policies, and source toggles
 
-- **Backend**: FastAPI / Python 3.12+
-- **Data Fetchers**: Asynchronous fetchers utilizing `aiohttp` and `BeautifulSoup4`.
-- **Frontend**: Static HTML/JS dashboard served directly by the API.
-- **Configuration**: Environment-based configuration via `.env`.
+## Architecture
 
-## 📦 Installation
+| Layer | Technology |
+|-------|-----------|
+| Backend | FastAPI / Python 3.12+ |
+| Data Fetchers | `aiohttp` + `BeautifulSoup4` (async) |
+| Frontend | Static HTML/JS dashboard served by the API |
+| Config | `.env` via `python-dotenv` |
+| QRZ Sync | Logbook API with ADIF parsing & JSONL cache |
+
+## Installation
 
 ### Local Development
 
-1. **Clone the repository**:
+1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd DXscraper
    ```
 
-2. **Install dependencies**:
+2. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configure environment**:
+3. **Configure environment**
+
    Create a `.env` file in the root directory:
+
    ```env
    DXPEDITION_MAX_AGE_SECONDS=3600
    DXPEDITION_REQUEST_TIMEOUT=30
@@ -43,60 +51,69 @@ A real-time monitoring tool for tracking active DXpeditions across various radio
    DXPEDITION_RETRY_DELAY_SECONDS=1.0
    ```
 
-4. **Run the Web API**:
+4. **Run the Web API**
+
    ```bash
    export PYTHONPATH=$PYTHONPATH:.
    uvicorn src.api:app --reload
    ```
-   Access the dashboard at `http://localhost:8000`.
 
-5. **Run the CLI Tool**:
+   Dashboard is available at [http://localhost:8000](http://localhost:8000).
+
+5. **Run the CLI Tool**
+
    ```bash
    export PYTHONPATH=$PYTHONPATH:.
    python src/main.py --format table
+   python src/main.py --format json --source dx_summit
+   python src/main.py --debug-qrz   # test QRZ API credentials
    ```
 
 ### Docker Deployment
 
-The project is fully containerized for easy deployment.
-
-1. **Build the image**:
-   ```bash
-   docker build -t dx-scraper .
-   ```
-
-2. **Run the container**:
-   ```bash
-   docker run -p 8000:8000 dx-scraper
-   ```
-
-3. **Run with custom configuration**:
-   ```bash
-   docker run -p 8000:8000 -e DXPEDITION_MAX_AGE_SECONDS=7200 dx-scraper
-   ```
-
-## 🧪 Testing
-
-The project uses `pytest` for comprehensive testing.
-
 ```bash
-# Install test dependencies
-pip install -r requirements.txt
+# Build
+docker build -t dx-scraper .
 
-# Run all tests
-export PYTHONPATH=$PYTHONPATH:.
-pytest
+# Run
+docker run -p 8000:8000 dx-scraper
+
+# With custom config
+docker run -p 8000:8000 -e DXPEDITION_MAX_AGE_SECONDS=7200 dx-scraper
 ```
 
-## 💻 API Endpoints
+## Testing
 
-- `GET /`: Serves the web dashboard.
-- `GET /data`: Returns a JSON summary of current DXpeditions.
-- `GET /qrz-status`: Returns QRZ credentials status.
-- `POST /qrz-token`: Stores QRZ.com API credentials.
-- `GET /qrz-sync`: Syncs QRZ logbook data.
-- `GET /qrz-cache`: Returns cached QRZ QSO data.
+```bash
+export PYTHONPATH=$PYTHONPATH:.
+pytest                          # all tests
+pytest tests/test_service.py -v  # single file
+```
 
-## 📜 License
+`pytest.ini` sets `asyncio_mode = auto` and `pythonpath = .`.
 
-This project is licensed under the MIT License.
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Web dashboard |
+| `GET` | `/data` | JSON summary of current DXpeditions |
+| `GET` | `/qrz-status` | QRZ credentials status |
+| `POST` | `/qrz-token` | Store QRZ.com API credentials |
+| `GET` | `/qrz-sync` | Sync QRZ logbook data |
+| `GET` | `/qrz-cache` | Cached QRZ QSO data |
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DXPEDITION_MAX_AGE_SECONDS` | `3600` | Max age of data before staleness |
+| `DXPEDITION_REQUEST_TIMEOUT` | `30` | HTTP request timeout (seconds) |
+| `DXPEDITION_RETRY_ATTEMPTS` | `3` | Retry attempts for failed requests |
+| `DXPEDITION_RETRY_DELAY_SECONDS` | `1.0` | Delay between retries |
+
+QRZ credentials are stored in `~/.config/dxscraper/dxscraper_config.json`, not in `.env`.
+
+## License
+
+MIT
