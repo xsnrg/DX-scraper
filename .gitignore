@@ -11,6 +11,7 @@ AGENTS.md
 dist/
 build/
 *.log
+.opencode
 
 # OS generated files
 .DS_Store

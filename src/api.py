@@ -16,6 +16,13 @@ app = FastAPI(title="DXpedition Monitor API")
 if os.path.exists("src/web"):
     app.mount("/static", StaticFiles(directory="src/web"), name="static")
 
+@app.get("/favicon.ico")
+async def favicon():
+    favicon_path = "src/web/favicon.ico"
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path, media_type="image/x-icon")
+    return await root()
+
 @app.get("/")
 async def root():
     # Serve the index.html file as the home page

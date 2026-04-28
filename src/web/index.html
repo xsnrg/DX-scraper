@@ -24,26 +24,34 @@
                 <p class="text-slate-400 mt-1">Real-time tracking of active DX expeditions</p>
             </div>
             <div class="flex items-center gap-3">
-                <button @click="syncQrzData" 
-                        :class="syncStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                        class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        :disabled="syncStatus === 'syncing'">
-                    <i class="fas" :class="syncStatus === 'syncing' ? 'fa-spinner fa-spin' : qrzReady ? 'fa-key' : 'fa-plug'"></i>
-                    {{ syncStatus === 'syncing' ? 'Syncing QRZ...' : syncStatus === 'success' ? 'Synced!' : syncStatus === 'error' ? 'Sync Failed' : qrzReady ? 'Refresh QRZ Data' : 'Setup QRZ' }}
-                </button>
-                <button @click="toggleQrzFilter"
-                        :class="qrzFilterEnabled ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                        class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        :disabled="!qrzCacheInfo.exists || qrzCacheInfo.count === 0">
-                    <i class="fas" :class="qrzFilterEnabled ? 'fa-filter' : 'fa-filter-open'"></i>
-                    {{ qrzFilterEnabled ? 'QRZ filter enabled' : 'QRZ filter disabled' }}
-                    <span class="text-xs opacity-75 block mt-1">{{ qrzCacheInfo.last_modified ? 'Last synced: ' + qrzCacheInfo.last_modified : '' }}</span>
-                </button>
-                <button @click="fetchData" :disabled="loading" 
-                        class="bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
-                    <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
-                    {{ loading ? 'Updating...' : 'Refresh Data' }}
-                </button>
+                <div class="flex flex-col items-center">
+                    <button @click="syncQrzData" 
+                            :class="syncStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="syncStatus === 'syncing'">
+                        <i class="fas" :class="syncStatus === 'syncing' ? 'fa-spinner fa-spin' : qrzReady ? 'fa-key' : 'fa-plug'"></i>
+                        {{ syncStatus === 'syncing' ? 'Syncing QRZ...' : syncStatus === 'success' ? 'Synced!' : syncStatus === 'error' ? 'Sync Failed' : qrzReady ? 'Refresh QRZ Data' : 'Setup QRZ' }}
+                    </button>
+                    <div class="text-xs text-slate-500 mt-1">{{ qrzCacheInfo.last_modified ? 'Last synced: ' + qrzCacheInfo.last_modified : '' }}</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <button @click="toggleQrzFilter"
+                            :class="qrzFilterEnabled ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="!qrzCacheInfo.exists || qrzCacheInfo.count === 0">
+                        <i class="fas" :class="qrzFilterEnabled ? 'fa-filter' : 'fa-filter-open'"></i>
+                        {{ qrzFilterEnabled ? 'QRZ filter enabled' : 'QRZ filter disabled' }}
+                    </button>
+                    <div class="text-xs text-transparent mt-1">QRZ filter</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <button @click="fetchData" :disabled="loading" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                        <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
+                        {{ loading ? 'Updating...' : 'Refresh Data' }}
+                    </button>
+                    <div class="text-xs text-slate-500 mt-1">Refresh in {{ countdownText }}</div>
+                </div>
             </div>
         </header>
 
@@ -204,7 +212,7 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, onBeforeUnmount } = Vue;
 
         createApp({
             setup() {
@@ -225,6 +233,7 @@
                 const showTokenField = ref(true);
                 const syncStatus = ref('idle');
                 let syncTimeout = null;
+                const nextRefreshTime = ref(new Date(Date.now() + 5 * 60 * 1000));
                 const qrzFilterEnabled = ref(localStorage.getItem('qrzFilterEnabled') === 'true');
                 const qrzCacheData = ref([]);
                 const qrzCacheMap = ref(new Map());
@@ -340,6 +349,7 @@
                         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                         summary.value = await response.json();
                         summary.value.last_refresh = new Date().toISOString();
+                        nextRefreshTime.value = new Date(Date.now() + 5 * 60 * 1000);
                     } catch (e) {
                         error.value = `Failed to load data: ${e.message}. Ensure the API is running.`;
                     } finally {
@@ -422,6 +432,36 @@
                     return date.toLocaleString(undefined, { hour12: false });
                 };
 
+                const countdownText = ref('5:00');
+
+                const updateCountdown = () => {
+                    const diff = nextRefreshTime.value - Date.now();
+                    if (diff <= 0) {
+                        countdownText.value = '0:00';
+                    } else {
+                        const mins = Math.floor(diff / 60000);
+                        const secs = Math.floor((diff % 60000) / 1000);
+                        countdownText.value = `${mins}:${secs.toString().padStart(2, '0')}`;
+                    }
+                };
+
+                const refreshInterval = setInterval(() => {
+                    fetchData();
+                    nextRefreshTime.value = new Date(Date.now() + 5 * 60 * 1000);
+                    updateCountdown();
+                }, 5 * 60 * 1000);
+
+                const countdownInterval = setInterval(updateCountdown, 1000);
+
+                onBeforeUnmount(() => {
+                    clearInterval(refreshInterval);
+                    clearInterval(countdownInterval);
+                });
+
+                onMounted(fetchData);
+                onMounted(checkQrzStatus);
+                onMounted(loadQrzCache);
+
                 onMounted(fetchData);
                 onMounted(checkQrzStatus);
                 onMounted(loadQrzCache);
@@ -500,13 +540,13 @@
                     summary, loading, error, searchQuery, 
                     sortKey, sortOrder, pageSize, currentPage,
                     columns, filteredStations, paginatedStations,
-                    fetchData, setSort, formatDate,
+                    fetchData, setSort, formatDate, countdownText,
                     showModal, showQrzModal, closeModal, saveQrzToken,
                     saving, qrzCallsign, qrzToken, qrzReady,
                     showCallsignField, showTokenField,
                     syncStatus, syncQrzData,
                     qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
-                    getQrzRowClass
+                    getQrzRowClass, nextRefreshTime
                 };
             }
         }).mount('#app');
