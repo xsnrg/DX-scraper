@@ -522,6 +522,7 @@
                         if (data.status === 'ok') {
                             syncStatus.value = 'success';
                             await loadQrzCache();
+                            qrzCacheInfo.value.last_modified = new Date().toLocaleString(undefined, { hour12: false });
                             clearTimeout(syncTimeout);
                             syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
                         } else {
