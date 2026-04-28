@@ -24,6 +24,21 @@
                 <p class="text-slate-400 mt-1">Real-time tracking of active DX expeditions</p>
             </div>
             <div class="flex items-center gap-3">
+                <button @click="syncQrzData" 
+                        :class="syncStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                        class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="syncStatus === 'syncing'">
+                    <i class="fas" :class="syncStatus === 'syncing' ? 'fa-spinner fa-spin' : qrzReady ? 'fa-key' : 'fa-plug'"></i>
+                    {{ syncStatus === 'syncing' ? 'Syncing QRZ...' : syncStatus === 'success' ? 'Synced!' : syncStatus === 'error' ? 'Sync Failed' : qrzReady ? 'Refresh QRZ Data' : 'Setup QRZ' }}
+                </button>
+                <button @click="toggleQrzFilter"
+                        :class="qrzFilterEnabled ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                        class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="!qrzCacheInfo.exists || qrzCacheInfo.count === 0">
+                    <i class="fas" :class="qrzFilterEnabled ? 'fa-filter' : 'fa-filter-open'"></i>
+                    {{ qrzFilterEnabled ? 'QRZ filter enabled' : 'QRZ filter disabled' }}
+                    <span class="text-xs opacity-75 block mt-1">{{ qrzCacheInfo.last_modified ? 'Last synced: ' + qrzCacheInfo.last_modified : '' }}</span>
+                </button>
                 <button @click="fetchData" :disabled="loading" 
                         class="bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
                     <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
@@ -84,7 +99,9 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-700">
-                        <tr v-for="station in paginatedStations" :key="station.callsign" class="hover:bg-slate-700/30 transition-colors">
+                        <tr v-for="station in paginatedStations" :key="station.callsign" 
+                            class="hover:bg-slate-700/30 transition-colors"
+                            :class="getQrzRowClass(station)">
                             <td class="px-6 py-4 font-mono font-bold text-blue-300">
                                 <a :href="`https://www.qrz.com/db/${station.callsign}`" target="_blank" class="hover:text-blue-400 hover:underline transition-colors">
                                     {{ station.callsign }}
@@ -155,6 +172,35 @@
             {{ error }}
             <button @click="fetchData" class="ml-auto underline font-bold">Retry</button>
         </div>
+
+        <!-- QRZ Token Modal -->
+        <div v-if="showModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="closeModal">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+                <h2 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                    <i class="fas fa-key"></i> QRZ.com API Credentials
+                </h2>
+                <div class="space-y-4">
+                    <div v-if="showCallsignField">
+                        <label class="block text-sm text-slate-400 mb-1">Callsign</label>
+                        <input v-model="qrzCallsign" type="text" placeholder="AB1CD"
+                               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase">
+                    </div>
+                    <div v-if="showTokenField">
+                        <label class="block text-sm text-slate-400 mb-1">API Token</label>
+                        <input v-model="qrzToken" type="password" placeholder="Enter your QRZ.com API token"
+                               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6 justify-end">
+                    <button @click="closeModal" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">
+                        Cancel
+                    </button>
+                    <button @click="saveQrzToken" :disabled="saving" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50">
+                        {{ saving ? 'Saving...' : 'Save' }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -170,6 +216,110 @@
                 const sortOrder = ref(-1);
                 const pageSize = ref(25);
                 const currentPage = ref(1);
+                const showModal = ref(false);
+                const saving = ref(false);
+                const qrzCallsign = ref('');
+                const qrzToken = ref('');
+                const qrzReady = ref(false);
+                const showCallsignField = ref(true);
+                const showTokenField = ref(true);
+                const syncStatus = ref('idle');
+                let syncTimeout = null;
+                const qrzFilterEnabled = ref(localStorage.getItem('qrzFilterEnabled') === 'true');
+                const qrzCacheData = ref([]);
+                const qrzCacheMap = ref(new Map());
+                const qrzCacheInfo = ref({ exists: false, count: 0, last_modified: '' });
+
+                const loadQrzCache = async () => {
+                    try {
+                        const resp = await fetch('/qrz-cache');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            qrzCacheData.value = data.data || [];
+                            qrzCacheInfo.value = { exists: data.exists || false, count: data.count || 0, last_modified: data.last_modified || '' };
+                            const map = new Map();
+                            for (const [call, band] of (data.data || [])) {
+                                const key = call.toUpperCase();
+                                if (!map.has(key)) map.set(key, new Set());
+                                map.get(key).add(band.toUpperCase());
+                            }
+                            qrzCacheMap.value = map;
+                        }
+                    } catch {
+                        qrzCacheData.value = [];
+                        qrzCacheMap.value = new Map();
+                        qrzCacheInfo.value = { exists: false, count: 0, last_modified: '' };
+                    }
+                };
+
+                const toggleQrzFilter = () => {
+                    qrzFilterEnabled.value = !qrzFilterEnabled.value;
+                    localStorage.setItem('qrzFilterEnabled', qrzFilterEnabled.value.toString());
+                };
+
+                const getQrzRowClass = (station) => {
+                    if (!qrzFilterEnabled.value || !qrzCacheData.value.length) return '';
+                    const call = station.callsign.toUpperCase();
+                    const stationBands = getStationBands(station);
+                    let status = 'none';
+                    for (const [qrzCall, qrzBand] of qrzCacheData.value) {
+                        if (qrzCall === call) {
+                            if (stationBands.includes(qrzBand)) {
+                                status = 'exact';
+                            } else if (status !== 'exact') {
+                                status = 'different_band';
+                            }
+                        }
+                    }
+                    if (status === 'exact' && qrzFilterEnabled.value) return '';
+                    if (status === 'different_band') return 'bg-amber-900/20';
+                    return '';
+                };
+
+                const getStationBands = (station) => {
+                    if (station.bands && station.bands.length) return station.bands.map(b => b.toUpperCase());
+                    if (station.frequency) {
+                        const freq = parseFloat(station.frequency);
+                        if (!isNaN(freq)) {
+                            const band = frequencyToBand(freq);
+                            if (band) return [band.toUpperCase()];
+                        }
+                    }
+                    return [];
+                };
+
+                const frequencyToBand = (freq) => {
+                    const bands = [
+                        { name: '160m', low: 1.8, high: 2.0 },
+                        { name: '80m', low: 3.5, high: 4.0 },
+                        { name: '40m', low: 7.0, high: 7.3 },
+                        { name: '30m', low: 10.1, high: 10.15 },
+                        { name: '20m', low: 14.0, high: 14.35 },
+                        { name: '17m', low: 18.068, high: 18.168 },
+                        { name: '15m', low: 21.0, high: 21.45 },
+                        { name: '12m', low: 24.89, high: 24.99 },
+                        { name: '10m', low: 28.0, high: 29.7 },
+                        { name: '6m', low: 50.0, high: 54.0 },
+                        { name: '2m', low: 144.0, high: 148.0 },
+                        { name: '70cm', low: 420.0, high: 450.0 },
+                    ];
+                    for (const b of bands) {
+                        if (freq >= b.low && freq <= b.high) return b.name;
+                    }
+                    return null;
+                };
+
+                const checkQrzStatus = async () => {
+                    try {
+                        const resp = await fetch('/qrz-status');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            qrzReady.value = !!(data.callsign && data.token);
+                        }
+                    } catch {
+                        qrzReady.value = false;
+                    }
+                };
 
                 const columns = [
                     { key: 'callsign', label: 'Callsign' },
@@ -189,6 +339,7 @@
                         const response = await fetch('/data');
                         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                         summary.value = await response.json();
+                        summary.value.last_refresh = new Date().toISOString();
                     } catch (e) {
                         error.value = `Failed to load data: ${e.message}. Ensure the API is running.`;
                     } finally {
@@ -206,29 +357,58 @@
                 };
 
                 const filteredStations = computed(() => {
-                    if (!summary.value) return [];
-                    let data = [...summary.value.stations];
-                    if (searchQuery.value) {
-                        const q = searchQuery.value.toLowerCase();
-                        data = data.filter(s => 
-                            s.callsign.toLowerCase().includes(q) || 
-                            s.name.toLowerCase().includes(q) || 
-                            s.location.toLowerCase().includes(q) ||
-                            (s.frequency && s.frequency.toString().toLowerCase().includes(q))
-                        );
+                    try {
+                        if (!summary.value || !summary.value.stations) return [];
+                        let data = [...summary.value.stations];
+                        if (qrzFilterEnabled.value && qrzCacheMap.value && qrzCacheMap.value.size) {
+                            const sCall = (s) => s.callsign.toUpperCase();
+                            const sBands = (s) => {
+                                if (s.bands && s.bands.length) return s.bands.map(b => b.toUpperCase());
+                                if (s.frequency) {
+                                    const freq = parseFloat(s.frequency);
+                                    if (!isNaN(freq)) {
+                                        const band = frequencyToBand(freq);
+                                        if (band) return [band.toUpperCase()];
+                                    }
+                                }
+                                return [];
+                            };
+                            data = data.filter(s => {
+                                const call = sCall(s);
+                                const bands = sBands(s);
+                                const qBands = qrzCacheMap.value.get(call);
+                                if (!qBands) return true;
+                                for (const b of bands) {
+                                    if (qBands.has(b)) return false;
+                                }
+                                return true;
+                            });
+                        }
+                        if (searchQuery.value) {
+                            const q = searchQuery.value.toLowerCase();
+                            data = data.filter(s => 
+                                s.callsign.toLowerCase().includes(q) || 
+                                s.name.toLowerCase().includes(q) || 
+                                s.location.toLowerCase().includes(q) ||
+                                (s.frequency && s.frequency.toString().toLowerCase().includes(q))
+                            );
+                        }
+                        data.sort((a, b) => {
+                            let valA = a[sortKey.value];
+                            let valB = b[sortKey.value];
+                            if (Array.isArray(valA)) valA = valA.join(', ');
+                            if (Array.isArray(valB)) valB = valB.join(', ');
+                            if (valA === null || valA === undefined) valA = '';
+                            if (valB === null || valB === undefined) valB = '';
+                            if (valA < valB) return -1 * sortOrder.value;
+                            if (valA > valB) return 1 * sortOrder.value;
+                            return 0;
+                        });
+                        return data;
+                    } catch (e) {
+                        console.error('filteredStations error:', e);
+                        return [];
                     }
-                    data.sort((a, b) => {
-                        let valA = a[sortKey.value];
-                        let valB = b[sortKey.value];
-                        if (Array.isArray(valA)) valA = valA.join(', ');
-                        if (Array.isArray(valB)) valB = valB.join(', ');
-                        if (valA === null || valA === undefined) valA = '';
-                        if (valB === null || valB === undefined) valB = '';
-                        if (valA < valB) return -1 * sortOrder.value;
-                        if (valA > valB) return 1 * sortOrder.value;
-                        return 0;
-                    });
-                    return data;
                 });
 
                 const paginatedStations = computed(() => {
@@ -243,12 +423,90 @@
                 };
 
                 onMounted(fetchData);
+                onMounted(checkQrzStatus);
+                onMounted(loadQrzCache);
+
+                const showQrzModal = () => {
+                    showModal.value = true;
+                    showCallsignField.value = true;
+                    showTokenField.value = true;
+                    qrzCallsign.value = '';
+                    qrzToken.value = '';
+                    checkQrzStatus().then(() => {
+                        if (qrzReady.value) {
+                            fetch('/qrz-status').then(r => r.json()).then(data => {
+                                qrzCallsign.value = data.callsign || '';
+                                qrzToken.value = data.token || '';
+                                showCallsignField.value = !!(data.callsign);
+                                showTokenField.value = !!(data.token);
+                            });
+                        }
+                    });
+                };
+
+                const closeModal = () => {
+                    showModal.value = false;
+                };
+
+                const saveQrzToken = async () => {
+                    saving.value = true;
+                    try {
+                        const resp = await fetch('/qrz-token', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                callsign: qrzCallsign.value,
+                                token: qrzToken.value
+                            })
+                        });
+                        if (!resp.ok) throw new Error('Failed to save');
+                        qrzReady.value = true;
+                        closeModal();
+                    } catch {
+                        // silently fail
+                    } finally {
+                        saving.value = false;
+                    }
+                };
+
+                const syncQrzData = async () => {
+                    if (syncStatus.value === 'syncing') return;
+                    if (!qrzReady.value) {
+                        showQrzModal();
+                        return;
+                    }
+                    syncStatus.value = 'syncing';
+                    try {
+                        const resp = await fetch('/qrz-sync');
+                        const data = await resp.json();
+                        if (data.status === 'ok') {
+                            syncStatus.value = 'success';
+                            await loadQrzCache();
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
+                        } else {
+                            syncStatus.value = 'error';
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                        }
+                    } catch {
+                        syncStatus.value = 'error';
+                        clearTimeout(syncTimeout);
+                        syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                    }
+                };
 
                 return {
                     summary, loading, error, searchQuery, 
                     sortKey, sortOrder, pageSize, currentPage,
                     columns, filteredStations, paginatedStations,
-                    fetchData, setSort, formatDate
+                    fetchData, setSort, formatDate,
+                    showModal, showQrzModal, closeModal, saveQrzToken,
+                    saving, qrzCallsign, qrzToken, qrzReady,
+                    showCallsignField, showTokenField,
+                    syncStatus, syncQrzData,
+                    qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
+                    getQrzRowClass
                 };
             }
         }).mount('#app');

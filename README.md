@@ -6,6 +6,7 @@ A real-time monitoring tool for tracking active DXpeditions across various radio
 
 - **Multi-Source Aggregation**: Pulls data from DX Summit, DX Cluster, and other amateur radio feeds.
 - **Real-time Monitoring**: Provides current status of active stations and their target bands/modes.
+- **QRZ QSO Integration**: Import your QRZ.com logbook, filter stations by your QSO history, and highlight matches.
 - **Web Dashboard**: A simple, clean interface to view current DX activity.
 - **REST API**: Easy integration via a FastAPI backend.
 - **CLI Tool**: A command-line interface for quick checks and JSON/Table output.
@@ -91,6 +92,10 @@ pytest
 
 - `GET /`: Serves the web dashboard.
 - `GET /data`: Returns a JSON summary of current DXpeditions.
+- `GET /qrz-status`: Returns QRZ credentials status.
+- `POST /qrz-token`: Stores QRZ.com API credentials.
+- `GET /qrz-sync`: Syncs QRZ logbook data.
+- `GET /qrz-cache`: Returns cached QRZ QSO data.
 
 ## 📜 License
 

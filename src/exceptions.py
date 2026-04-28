@@ -23,3 +23,9 @@ class DataStalenessException(DXDataError):
         self.max_age = max_age
         self.actual_age = actual_age
         super().__init__(f"Data is too old. Max age: {max_age}s, Actual age: {actual_age}s")
+
+
+class QRZDataError(DXDataError):
+    """Error when fetching QSO data from QRZ"""
+    def __init__(self, message: str):
+        super().__init__(f"QRZ QSO error: {message}")

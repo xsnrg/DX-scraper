@@ -5,6 +5,7 @@ venv/
 **/*.pyc
 # Environment variables
 .env
+AGENTS.md
 
 # Build / output folders
 dist/

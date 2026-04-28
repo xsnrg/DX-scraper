@@ -2,12 +2,15 @@ import asyncio
 import json
 import logging
 import argparse
+import sys
 from datetime import datetime
 from typing import Optional
 
 from src.models import DXDataSummary
 from src.service import DXPeditionService
 from src.config import Config
+from src.qrz_qso import sync_qso_data, LOG_FILE
+from src.qrz_config import get_qrz_data
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,13 +88,51 @@ def parse_args():
     parser.add_argument("--format", choices=["json", "table"], default="json",
                        help="Output format (default: json)")
     parser.add_argument("--source", choices=["dx_summit", "dxcluster"],
-                       help="Filter by specific data source")
+                        help="Filter by specific data source")
+    parser.add_argument("--debug-qrz", action="store_true",
+                        help="Test QRZ API with stored credentials and print verbose debug output")
     return parser.parse_args()
 
 
 async def main_entry():
     args = parse_args()
+    if args.debug_qrz:
+        await _debug_qrz()
+        return
     await main(args.max_age, args.format, source=args.source)
+
+
+async def _debug_qrz():
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s"
+    )
+    logger = logging.getLogger(__name__)
+    
+    data = get_qrz_data()
+    callsign = data.get("callsign", "")
+    token = data.get("token", "")
+    
+    if not callsign or not token:
+        print("ERROR: No QRZ credentials found in", get_qrz_data.__module__)
+        print("Store them with: python -m src.main --debug-qrz (via the web UI)")
+        sys.exit(1)
+    
+    print(f"Callsign: {callsign}")
+    print(f"Token: {token[:10]}...{token[-5:]}")
+    print(f"Log file: {LOG_FILE}")
+    print()
+    
+    print("=== Step 1: Authenticating ===")
+    try:
+        result = await sync_qso_data(callsign, token)
+        print(f"Result: {json.dumps(result, indent=2)}")
+    except Exception as e:
+        print(f"Error: {e}")
+        print()
+        print("=== Check log file for details: ===")
+        print(f"  cat {LOG_FILE}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
