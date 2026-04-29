@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class HamQTHFetcher(BaseFetcher):
     def __init__(self, session: aiohttp.ClientSession):
-        super().__init__("HamQTH DX Cluster", session)
+        super().__init__("HamQTH", session)
 
     async def fetch(self) -> List[DXStation]:
         url = "https://www.hamqth.com/dxc_csv.php?limit=100"
@@ -30,11 +30,11 @@ class HamQTHFetcher(BaseFetcher):
                 continue
                 
             try:
-                # 0: Call, 1: Frequency, 2: Spotter, 3: Comment, 4: Date/Time, 
+                # 0: Spotter, 1: Frequency, 2: Call (DX), 3: Comment, 4: Date/Time, 
                 # 5: LoTW, 6: eQSL, 7: Continent, 8: Band, 9: Country, 10: ADIF
-                callsign = parts[0].strip()
+                spotter = parts[0].strip()
                 frequency_str = parts[1].strip()
-                spotter = parts[2].strip()
+                callsign = parts[2].strip()
                 comment = parts[3].strip()
                 date_time_str = parts[4].strip()
                 band = parts[8].strip()
@@ -54,9 +54,6 @@ class HamQTHFetcher(BaseFetcher):
                 except Exception as e:
                     logger.debug(f"Could not parse date {date_time_str}: {e}")
                     last_update = datetime.now(timezone.utc)
-
-                if not self.validate_age(last_update):
-                    continue
 
                 stations.append(DXStation(
                     callsign=callsign,

@@ -62,9 +62,6 @@ class DXSummitFetcher(BaseFetcher):
                 except (ValueError, AttributeError):
                     last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 
-                if not self.validate_age(last_update):
-                    continue
-                
                 band = spot.get("band", "").strip()
                 mode = spot.get("mode", "").strip()
                 info = spot.get("info", "") or ""

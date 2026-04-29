@@ -37,7 +37,7 @@ class TestDXPeditionService:
                 mode="CW",
                 comment="Tasmania DXpedition",
                 last_update=now - timedelta(minutes=10),
-                source="DX Cluster"
+                source="Spothole"
             ),
             DXStation(
                 callsign="P49P",

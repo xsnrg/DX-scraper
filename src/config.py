@@ -11,10 +11,10 @@ class Config:
     RETRY_DELAY_SECONDS = float(os.getenv("DXPEDITION_RETRY_DELAY_SECONDS", 1.0))
     
     DATA_SOURCES = {
-        "dx_cluster": {"name": "DX Cluster", "enabled": True},
+        "dx_cluster": {"name": "Spothole", "enabled": True},
         "dx_news": {"name": "DX News", "enabled": True},
         "dx_summit": {"name": "DX Summit", "enabled": True},
-        "hamqth": {"name": "HamQTH DX Cluster", "enabled": True},
+        "hamqth": {"name": "HamQTH", "enabled": True},
     }
     @classmethod
     def get_enabled_sources(cls):

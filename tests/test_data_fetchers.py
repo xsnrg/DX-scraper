@@ -55,8 +55,7 @@ class TestBaseFetcher:
     async def test_validate_age_stale(self, base_fetcher):
         last_update = datetime.now(timezone.utc) - timedelta(seconds=7200)
         
-        with pytest.raises(DataStalenessException):
-            base_fetcher.validate_age(last_update)
+        assert base_fetcher.validate_age(last_update) is False
 
 
 class TestDXSummitFetcher:
@@ -103,7 +102,8 @@ class TestDXSummitFetcher:
         mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
 
         stations = await fetcher.fetch()
-        assert len(stations) == 0
+        assert len(stations) == 1
+        assert stations[0].callsign == "AB1CD"
 
     @pytest.mark.asyncio
     async def test_fetch_invalid_date_uses_now(self, fetcher, mock_session):
@@ -131,19 +131,21 @@ class TestDXClusterFetcher:
 
     @pytest.mark.asyncio
     async def test_fetch_successful(self, fetcher, mock_session):
-        html_content = """
-        <html>
-            <tr>
-                <td>XY9ZZ</td>
-                <td>Cluster Station</td>
-                <td>Canada</td>
-                <td>2025-01-09 10:30 11:00</td>
-            </tr>
-        </html>
-        """
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [{
+            "dx_call": "XY9ZZ",
+            "dx_country": "Canada",
+            "de_call": "Cluster Station",
+            "band": "20m",
+            "mode": "CW",
+            "freq": 14200000,
+            "comment": "Test Spot",
+            "time_iso": now.isoformat()
+        }]
         mock_response = AsyncMock()
         mock_response.status = 200
-        mock_response.text = AsyncMock(return_value=html_content)
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
         
         mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
         mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -152,31 +154,39 @@ class TestDXClusterFetcher:
 
         assert len(stations) == 1
         assert stations[0].callsign == "XY9ZZ"
-        assert stations[0].source == "DX Cluster"
+        assert stations[0].source == "Spothole"
         assert stations[0].status == "active"
-        assert stations[0].band == ""
+        assert stations[0].band == "20m"
 
     @pytest.mark.asyncio
     async def test_fetch_skips_comments(self, fetcher, mock_session):
-        html_content = """
-        <html>
-            <tr>
-                <td>#COMMENT</td>
-                <td>Comment</td>
-                <td>World</td>
-                <td>2025-01-09 10:30 11:00</td>
-            </tr>
-            <tr>
-                <td>XY9ZZ</td>
-                <td>Real Station</td>
-                <td>Canada</td>
-                <td>2025-01-09 10:30 11:00</td>
-            </tr>
-        </html>
-        """
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [
+            {
+                "dx_call": "#COMMENT",
+                "dx_country": "World",
+                "de_call": "Comment",
+                "band": "20m",
+                "mode": "CW",
+                "freq": 14200000,
+                "comment": "Comment Spot",
+                "time_iso": now.isoformat()
+            },
+            {
+                "dx_call": "XY9ZZ",
+                "dx_country": "Canada",
+                "de_call": "Real Station",
+                "band": "20m",
+                "mode": "CW",
+                "freq": 14200000,
+                "comment": "Real Spot",
+                "time_iso": now.isoformat()
+            }
+        ]
         mock_response = AsyncMock()
         mock_response.status = 200
-        mock_response.text = AsyncMock(return_value=html_content)
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
         
         mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
         mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)

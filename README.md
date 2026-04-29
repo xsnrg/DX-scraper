@@ -1,12 +1,12 @@
 # DXpedition Monitor
 
-A real-time monitoring tool for tracking active DXpeditions across various amateur radio data sources. Aggregates data from DX Summit, DX Cluster, DX News, and HamQTH into a unified dashboard with QRZ.com QSO history integration.
+A real-time monitoring tool for tracking active DXpeditions across various amateur radio data sources. Aggregates data from DX Summit, Spothole (DX Cluster), DX News, and HamQTH into a unified dashboard with QRZ.com QSO history integration.
 
-![DXpedition Monitor Dashboard](dashboard-screenshot.png)
+![DXpedition Monitor Dashboard](screenshot.png)
 
 ## Features
 
-- **Multi-Source Aggregation** — Pulls live data from DX Summit, DX Cluster, DX News, and HamQTH
+- **Multi-Source Aggregation** — Pulls live data from DX Summit, Spothole, DX News, and HamQTH with deduplication across sources
 - **Real-Time Dashboard** — Clean web interface with auto-refresh countdown timer showing active stations, frequencies, and modes
 - **QRZ QSO Integration** — Import your QRZ.com logbook to filter and highlight stations you've contacted, with one-click sync
 - **QRZ Filter** — Toggle QRZ QSO data overlay directly from the dashboard

@@ -49,6 +49,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
                         "comment": s.comment,
                         "last_update": s.last_update.isoformat(),
                         "source": s.source,
+                        "sources": s.sources,
                         "status": s.status
                     }
                     for s in summary.stations
@@ -61,7 +62,8 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
             for station in summary.stations:
                 freq_str = f"{station.frequency:.4f}" if station.frequency else ""
                 mode_comment = f"{station.mode}" if station.mode else station.comment
-                print(f"{station.callsign:<10} {station.dx_country:<15} {station.spotter:<15} {station.band:<8} {freq_str:<12} {mode_comment:<30} {station.last_update.strftime('%Y-%m-%d %H:%M'):<20} {station.source}")
+                sources_str = ", ".join(station.sources) if station.sources else station.source
+                print(f"{station.callsign:<10} {station.dx_country:<15} {station.spotter:<15} {station.band:<8} {freq_str:<12} {mode_comment:<30} {station.last_update.strftime('%Y-%m-%d %H:%M'):<20} {sources_str}")
         else:
             print(f"Unknown format: {output_format}")
         

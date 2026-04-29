@@ -24,14 +24,20 @@ class DXPeditionService:
         return filtered
 
     def deduplicate_stations(self, stations: List[DXStation]) -> List[DXStation]:
-        seen = {}
+        seen: dict[str, DXStation] = {}
+        sources: dict[str, set[str]] = {}
         for station in stations:
             if station.callsign not in seen:
                 seen[station.callsign] = station
+                sources[station.callsign] = {station.source}
             else:
+                sources[station.callsign].add(station.source)
                 existing = seen[station.callsign]
                 if self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
                     seen[station.callsign] = station
+        
+        for callsign in seen:
+            seen[callsign].sources = sorted(sources[callsign])
         
         return list(seen.values())
 

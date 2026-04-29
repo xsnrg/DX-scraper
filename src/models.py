@@ -16,6 +16,7 @@ class DXStation(BaseModel):
     comment: str = ""
     last_update: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
     source: str
+    sources: list[str] = []
     status: str = "active"
 
     @field_validator("callsign")

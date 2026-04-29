@@ -40,6 +40,10 @@ class BaseFetcher:
             last_update = last_update.replace(tzinfo=timezone.utc)
         age = datetime.now(timezone.utc) - last_update
         if age > max_age:
-            raise DataStalenessException(Config.DATA_MAX_AGE_SECONDS, int(age.total_seconds()))
+            return False
         return True
+
+    def validate_all_stations(self, stations: list) -> None:
+        if not stations:
+            raise DataStalenessException(Config.DATA_MAX_AGE_SECONDS, 0)
 

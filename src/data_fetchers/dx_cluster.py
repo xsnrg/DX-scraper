@@ -1,7 +1,6 @@
 import aiohttp
 import logging
-from typing import List
-from bs4 import BeautifulSoup
+from typing import List, Dict, Any
 from datetime import datetime, timezone
 
 from .base import BaseFetcher
@@ -12,49 +11,78 @@ logger = logging.getLogger(__name__)
 
 class DXClusterFetcher(BaseFetcher):
     def __init__(self, session: aiohttp.ClientSession):
-        super().__init__("DX Cluster", session)
+        super().__init__("Spothole", session)
+        self.api_url = "https://spothole.app/api/v1/spots"
+        self.spots_limit = 1000
+
+    def _parse_spots_json(self, json_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return json_data
 
     async def fetch(self) -> List[DXStation]:
-        html = await self.fetch_with_retry("https://www.dxcluster.net/")
-        soup = BeautifulSoup(html, "lxml")
+        json_data = await self.fetch_with_retry(self.api_url)
+        if not json_data:
+            return []
         
-        stations = []
-        for row in soup.find_all("tr"):
+        import json
+        spots = json.loads(json_data)
+        
+        stations_map: Dict[str, DXStation] = {}
+        
+        for spot in spots:
             try:
-                cells = row.find_all("td")
-                if len(cells) < 4:
+                dx_call = (spot.get("dx_call") or "").strip()
+                if not dx_call or dx_call.startswith("#"):
                     continue
                 
-                callsign = cells[0].get_text(strip=True)
-                if not callsign or callsign.startswith("#"):
+                if dx_call in stations_map:
                     continue
                 
-                spotter = cells[1].get_text(strip=True)
-                location = cells[2].get_text(strip=True)
-                last_update_str = cells[3].get_text(strip=True)
+                freq = spot.get("freq")
+                if freq:
+                    try:
+                        f = float(freq)
+                        if f == f and f != float('inf') and f != float('-inf'):
+                            frequency = f / 1000.0
+                        else:
+                            frequency = None
+                    except (ValueError, TypeError):
+                        frequency = None
+                else:
+                    frequency = None
                 
                 try:
-                    last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
-                except ValueError:
+                    time_iso = spot.get("time_iso", "")
+                    last_update = datetime.fromisoformat(time_iso)
+                except (ValueError, AttributeError):
                     last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
                 
                 if not self.validate_age(last_update):
                     continue
                 
-                stations.append(DXStation(
-                    callsign=callsign,
-                    dx_country=location,
+                band = (spot.get("band") or "").strip()
+                mode = (spot.get("mode") or "").strip()
+                comment = spot.get("comment") or ""
+                dx_country = spot.get("dx_country") or ""
+                spotter = (spot.get("de_call") or "").strip()
+
+                if not band and frequency is None:
+                    continue
+
+                stations_map[dx_call] = DXStation(
+                    callsign=dx_call,
+                    dx_country=dx_country,
                     spotter_country="",
                     spotter=spotter,
-                    band="",
-                    frequency=None,
-                    mode="",
-                    comment="",
+                    band=band,
+                    frequency=frequency,
+                    mode=mode,
+                    comment=comment[:100],
                     last_update=last_update,
-                    source="DX Cluster"
-                ))
+                    source="Spothole"
+                )
             except Exception as e:
-                logger.error(f"Error parsing DX Cluster row: {e}")
+                logger.error(f"Error parsing DX Cluster spot: {e}")
                 continue
         
-        return stations
+        self.validate_all_stations(list(stations_map.values()))
+        return list(stations_map.values())
