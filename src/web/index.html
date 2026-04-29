@@ -75,7 +75,7 @@
         <div v-if="summary" class="bg-slate-800 p-4 rounded-t-xl border-x border-t border-slate-700 flex flex-col md:flex-row gap-4 items-center justify-between">
             <div class="relative w-full md:w-[30rem]">
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
-                <input v-model="searchQuery" type="text" placeholder="Search callsign, name, location or frequency..." 
+                <input v-model="searchQuery" type="text" placeholder="Search callsign, DX, location or frequency..." 
                        class="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
             </div>
             
@@ -332,7 +332,7 @@
 
                 const columns = [
                     { key: 'callsign', label: 'Callsign' },
-                    { key: 'name', label: 'Name' },
+                    { key: 'name', label: 'DX' },
                     { key: 'location', label: 'Location' },
                     { key: 'bands', label: 'Bands' },
                     { key: 'frequency', label: 'Frequency' },

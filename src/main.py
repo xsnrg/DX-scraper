@@ -55,7 +55,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
             }
             print(json.dumps(output, indent=2))
         elif output_format == "table":
-            print(f"{'Callsign':<10} {'Name':<30} {'Location':<20} {'Bands':<30} {'Frequency':<15} {'Last Update'}")
+            print(f"{'Callsign':<10} {'DX':<30} {'Location':<20} {'Bands':<30} {'Frequency':<15} {'Last Update'}")
             print("-" * 125)
             for station in summary.stations:
                 bands_str = ", ".join(station.bands[:3]) if station.bands else ""
