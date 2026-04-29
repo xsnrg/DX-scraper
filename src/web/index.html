@@ -385,10 +385,14 @@
                         if (searchQuery.value) {
                             const q = searchQuery.value.toLowerCase();
                             data = data.filter(s => 
-                                s.callsign.toLowerCase().includes(q) || 
-                                s.name.toLowerCase().includes(q) || 
-                                s.dx_country.toLowerCase().includes(q) ||
-                                s.spotter.toLowerCase().includes(q) ||
+                                (s.callsign && s.callsign.toLowerCase().includes(q)) || 
+                                (s.dx_country && s.dx_country.toLowerCase().includes(q)) ||
+                                (s.spotter_country && s.spotter_country.toLowerCase().includes(q)) ||
+                                (s.spotter && s.spotter.toLowerCase().includes(q)) ||
+                                (s.band && s.band.toLowerCase().includes(q)) ||
+                                (s.mode && s.mode.toLowerCase().includes(q)) ||
+                                (s.comment && s.comment.toLowerCase().includes(q)) ||
+                                (s.source && s.source.toLowerCase().includes(q)) ||
                                 (s.frequency && s.frequency.toString().toLowerCase().includes(q))
                             );
                         }

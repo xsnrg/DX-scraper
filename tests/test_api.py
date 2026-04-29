@@ -50,6 +50,23 @@ def test_qrz_sync_with_credentials(tmp_path, monkeypatch, mocker):
     mock_sync.assert_called_once()
 
 
+def test_data_endpoint_has_all_search_fields():
+    """Test that /data returns all fields the frontend search operates on."""
+    response = client.get("/data")
+    assert response.status_code == 200
+    data = response.json()
+    # stations should be a list
+    stations = data.get("stations", [])
+    if not stations:
+        pytest.skip("No stations available to validate schema")
+    required_fields = [
+        "callsign", "dx_country", "spotter_country", "spotter",
+        "band", "frequency", "mode", "comment", "source", "last_update"
+    ]
+    for field in required_fields:
+        assert field in stations[0], f"Missing field '{field}' in /data response"
+
+
 def test_qrz_cache_no_file(tmp_path, monkeypatch):
     """Test /qrz-cache returns empty list when no cache file exists."""
     from src.qrz_qso import QSO_CACHE_FILE
