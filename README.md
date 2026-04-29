@@ -73,16 +73,19 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 
 ### Docker Deployment
 
+Run the app with a single command:
+
 ```bash
-# Build
-docker build -t dx-scraper .
-
-# Run
-docker run -p 8000:8000 dx-scraper
-
-# With custom config
-docker run -p 8000:8000 -e DXPEDITION_MAX_AGE_SECONDS=7200 dx-scraper
+docker run -p 8000:8000 ghcr.io/xsnrg/dx-scraper:latest
 ```
+
+With custom config:
+
+```bash
+docker run -p 8000:8000 -e DXPEDITION_MAX_AGE_SECONDS=7200 ghcr.io/xsnrg/dx-scraper:latest
+```
+
+Dashboard is available at [http://localhost:8000](http://localhost:8000).
 
 ## Testing
 
