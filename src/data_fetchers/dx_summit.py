@@ -67,15 +67,19 @@ class DXSummitFetcher(BaseFetcher):
                 
                 band = spot.get("band", "").strip()
                 mode = spot.get("mode", "").strip()
+                info = spot.get("info", "") or ""
+                dx_country = spot.get("dx_country", "") or ""
+                spotter = spot.get("spotter", "") or ""
 
                 stations_map[dx_call] = DXStation(
                     callsign=dx_call,
-                    name=spot.get("info", "")[:50] if spot.get("info") else "",
-                    location=spot.get("dx_country", ""),
+                    dx_country=dx_country,
+                    spotter_country="",
+                    spotter=spotter,
+                    band=band,
                     frequency=frequency,
-                    bands=[band] if band else [],
-                    active_band=band if band else None,
-                    active_mode=mode if mode else None,
+                    mode=mode,
+                    comment=info[:100],
                     last_update=last_update,
                     source="DX Summit"
                 )
@@ -84,4 +88,3 @@ class DXSummitFetcher(BaseFetcher):
                 continue
         
         return list(stations_map.values())
-

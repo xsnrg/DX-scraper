@@ -41,11 +41,13 @@ class DXNewsFetcher(BaseFetcher):
                     
                     stations.append(DXStation(
                         callsign=callsign,
-                        name="DX News",
-                        location=description[:50] if description else "",
-                        bands=[],
-                        active_band=None,
-                        active_mode=None,
+                        dx_country="",
+                        spotter_country="",
+                        spotter="",
+                        band="",
+                        frequency=None,
+                        mode="",
+                        comment=description[:200],
                         last_update=pub_date,
                         source="DXNews"
                     ))

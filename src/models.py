@@ -7,12 +7,13 @@ class DXStation(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     callsign: str
-    name: str
-    location: str
+    dx_country: str = ""
+    spotter_country: str = ""
+    spotter: str = ""
+    band: str = ""
     frequency: Optional[float] = None
-    bands: list[str] = Field(default_factory=list)
-    active_band: Optional[str] = None
-    active_mode: Optional[str] = None
+    mode: str = ""
+    comment: str = ""
     last_update: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
     source: str
     status: str = "active"

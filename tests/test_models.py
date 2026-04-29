@@ -7,8 +7,13 @@ from pydantic import ValidationError
 class MockObject:
     """Mock object for testing model validation"""
     callsign = "MOCK123"
-    name = "Mock Station"
-    location = "Mock Location"
+    dx_country = "Mock Country"
+    spotter_country = "Mock Spotter Country"
+    spotter = "Mock Spotter"
+    band = "20m"
+    frequency = 14.2
+    mode = "SSB"
+    comment = "Mock Comment"
     bands = ["20m", "40m"]
     active_band = "20m"
     active_mode = "SSB"
@@ -23,17 +28,19 @@ class TestDXStation:
         """Test that DXStation can be created with all required fields"""
         station = DXStation.model_validate(MockObject())
         assert station.callsign == "MOCK123"
-        assert station.name == "Mock Station"
+        assert station.dx_country == "Mock Country"
 
     def test_dx_station_model_dump(self):
         """Test model serialization"""
         station = DXStation(
             callsign="TEST123",
-            name="Test Station",
-            location="Test Location",
-            bands=["20m", "40m"],
-            active_band="20m",
-            active_mode="SSB",
+            dx_country="Test Country",
+            spotter_country="Spotter Country",
+            spotter="Test Spotter",
+            band="20m",
+            frequency=14.2,
+            mode="SSB",
+            comment="Test Comment",
             last_update=datetime.now(timezone.utc),
             source="test_source",
             status="active"
@@ -41,16 +48,16 @@ class TestDXStation:
         dump = station.model_dump()
         assert isinstance(dump, dict)
         assert dump['callsign'] == "TEST123"
-        assert dump['name'] == "Test Station"
-        assert dump['bands'] == ["20m", "40m"]
+        assert dump['dx_country'] == "Test Country"
+        assert dump['band'] == "20m"
 
     def test_dx_station_model_copy(self):
         """Test model copying"""
         station = DXStation(
             callsign="TEST123",
-            name="Test Station",
-            location="Test Location",
-            bands=["20m"],
+            dx_country="Test Country",
+            spotter="Test Spotter",
+            band="20m",
             last_update=datetime.now(timezone.utc),
             source="test_source"
         )
@@ -62,9 +69,9 @@ class TestDXStation:
         """Test that default last_update has timezone info"""
         station = DXStation(
             callsign="TEST123",
-            name="Test Station",
-            location="Test Location",
-            bands=["20m"],
+            dx_country="Test Country",
+            spotter="Test Spotter",
+            band="20m",
             source="test_source"
         )
         assert station.last_update.tzinfo is not None
@@ -74,9 +81,9 @@ class TestDXStation:
         with pytest.raises(ValidationError):
             DXStation(
                 callsign=123,
-                name="Test Station",
-                location="Test Location",
-                bands=["20m"],
+                dx_country="Test Country",
+                spotter="Test Spotter",
+                band="20m",
                 last_update=datetime.now(timezone.utc),
                 source="test_source"
             )
@@ -86,9 +93,9 @@ class TestDXStation:
         with pytest.raises(ValidationError):
             DXStation(
                 callsign="   ",
-                name="Test Station",
-                location="Test Location",
-                bands=["20m"],
+                dx_country="Test Country",
+                spotter="Test Spotter",
+                band="20m",
                 last_update=datetime.now(timezone.utc),
                 source="test_source"
             )
@@ -97,13 +104,13 @@ class TestDXStation:
         """Test DXStation with unicode characters in fields"""
         station = DXStation(
             callsign="P49P",
-            name="Palau DXpedition",
-            location="Palau 🇵🇼",
-            bands=["20m", "15m"],
+            dx_country="Palau 🇵🇼",
+            spotter="Test Spotter",
+            band="20m",
             last_update=datetime.now(timezone.utc),
             source="test_source"
         )
-        assert station.location == "Palau 🇵🇼"
+        assert station.dx_country == "Palau 🇵🇼"
         assert station.callsign == "P49P"
 
 
@@ -127,9 +134,9 @@ class TestDXDataSummary:
         """Test DXDataSummary with actual station data"""
         station = DXStation(
             callsign="TEST123",
-            name="Test Station",
-            location="Test Location",
-            bands=["20m"],
+            dx_country="Test Country",
+            spotter="Test Spotter",
+            band="20m",
             last_update=datetime.now(),
             source="test_source"
         )
@@ -154,9 +161,9 @@ class TestDXDataSummary:
         """Test model serialization"""
         station = DXStation(
             callsign="TEST123",
-            name="Test Station",
-            location="Test Location",
-            bands=["20m"],
+            dx_country="Test Country",
+            spotter="Test Spotter",
+            band="20m",
             last_update=datetime.now(timezone.utc),
             source="test_source"
         )
@@ -177,9 +184,9 @@ class TestDXDataSummary:
         """Test model copying"""
         station = DXStation(
             callsign="TEST123",
-            name="Test Station",
-            location="Test Location",
-            bands=["20m"],
+            dx_country="Test Country",
+            spotter="Test Spotter",
+            band="20m",
             last_update=datetime.now(timezone.utc),
             source="test_source"
         )
@@ -194,4 +201,3 @@ class TestDXDataSummary:
         copied = summary.model_copy()
         assert copied.total_stations == summary.total_stations
         assert copied is not summary
-

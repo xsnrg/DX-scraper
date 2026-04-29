@@ -40,12 +40,13 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
                 "stations": [
                     {
                         "callsign": s.callsign,
-                        "name": s.name,
-                        "location": s.location,
+                        "dx_country": s.dx_country,
+                        "spotter_country": s.spotter_country,
+                        "spotter": s.spotter,
+                        "band": s.band,
                         "frequency": s.frequency,
-                        "bands": s.bands,
-                        "active_band": s.active_band,
-                        "active_mode": s.active_mode,
+                        "mode": s.mode,
+                        "comment": s.comment,
                         "last_update": s.last_update.isoformat(),
                         "source": s.source,
                         "status": s.status
@@ -55,12 +56,12 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
             }
             print(json.dumps(output, indent=2))
         elif output_format == "table":
-            print(f"{'Callsign':<10} {'DX':<30} {'Location':<20} {'Bands':<30} {'Frequency':<15} {'Last Update'}")
-            print("-" * 125)
+            print(f"{'Callsign':<10} {'DX Country':<15} {'Spotter':<15} {'Band':<8} {'Freq':<12} {'Mode/Comment':<30} {'Updated':<20} {'Source'}")
+            print("-" * 130)
             for station in summary.stations:
-                bands_str = ", ".join(station.bands[:3]) if station.bands else ""
-                freq_str = f"{station.frequency:.4f} MHz" if station.frequency else ""
-                print(f"{station.callsign:<10} {station.name:<30} {station.location:<20} {bands_str:<30} {freq_str:<15} {station.last_update.strftime('%Y-%m-%d %H:%M')}")
+                freq_str = f"{station.frequency:.4f}" if station.frequency else ""
+                mode_comment = f"{station.mode}" if station.mode else station.comment
+                print(f"{station.callsign:<10} {station.dx_country:<15} {station.spotter:<15} {station.band:<8} {freq_str:<12} {mode_comment:<30} {station.last_update.strftime('%Y-%m-%d %H:%M'):<20} {station.source}")
         else:
             print(f"Unknown format: {output_format}")
         

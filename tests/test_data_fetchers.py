@@ -84,11 +84,9 @@ class TestDXSummitFetcher:
 
         assert len(stations) == 1
         assert stations[0].callsign == "AB1CD"
-        assert stations[0].name == "Test Station"
-        assert stations[0].location == ""
-        assert "20m" in stations[0].bands
-        assert stations[0].active_band == "20m"
-        assert stations[0].active_mode == "CW"
+        assert stations[0].dx_country == ""
+        assert stations[0].band == "20m"
+        assert stations[0].mode == "CW"
         assert stations[0].source == "DX Summit"
         assert stations[0].status == "active"
 
@@ -156,8 +154,7 @@ class TestDXClusterFetcher:
         assert stations[0].callsign == "XY9ZZ"
         assert stations[0].source == "DX Cluster"
         assert stations[0].status == "active"
-        assert stations[0].bands == []
-        assert stations[0].active_band is None
+        assert stations[0].band == ""
 
     @pytest.mark.asyncio
     async def test_fetch_skips_comments(self, fetcher, mock_session):
@@ -197,8 +194,9 @@ class TestFetchAllData:
         mock_fetcher.fetch = AsyncMock(return_value=[
             DXStation(
                 callsign="AB1CD",
-                name="Test",
-                location="USA",
+                dx_country="USA",
+                spotter="Test Spotter",
+                band="20m",
                 last_update=datetime.now(timezone.utc),
                 source="Test"
             )

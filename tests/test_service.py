@@ -17,31 +17,37 @@ class TestDXPeditionService:
         return [
             DXStation(
                 callsign="P49P",
-                name="Palau DXpedition",
-                location="Palau",
-                bands=["20m", "15m", "10m"],
-                active_band="20m",
-                active_mode="SSB",
+                dx_country="Palau",
+                spotter_country="",
+                spotter="Test Spotter",
+                band="20m",
+                frequency=14.2,
+                mode="SSB",
+                comment="Palau DXpedition",
                 last_update=now - timedelta(minutes=5),
                 source="DX Summit"
             ),
             DXStation(
                 callsign="VK7ZZ",
-                name="Tasmania DXpedition",
-                location="Tasmania",
-                bands=["40m", "20m", "15m"],
-                active_band="40m",
-                active_mode="CW",
+                dx_country="Tasmania",
+                spotter_country="",
+                spotter="Test Spotter",
+                band="40m",
+                frequency=7.1,
+                mode="CW",
+                comment="Tasmania DXpedition",
                 last_update=now - timedelta(minutes=10),
                 source="DX Cluster"
             ),
             DXStation(
                 callsign="P49P",
-                name="Palau DXpedition (duplicate)",
-                location="Palau",
-                bands=["20m", "15m"],
-                active_band="20m",
-                active_mode="SSB",
+                dx_country="Palau",
+                spotter_country="",
+                spotter="Test Spotter",
+                band="20m",
+                frequency=14.2,
+                mode="SSB",
+                comment="Palau DXpedition (duplicate)",
                 last_update=now - timedelta(minutes=2),
                 source="DX Summit"
             )
@@ -50,9 +56,9 @@ class TestDXPeditionService:
     def test_filter_by_age(self, service, sample_stations):
         old_station = DXStation(
             callsign="OLD1",
-            name="Old Station",
-            location="Somewhere",
-            bands=[],
+            dx_country="Somewhere",
+            spotter="Test Spotter",
+            band="",
             last_update=datetime.now(timezone.utc) - timedelta(hours=2),
             source="Test"
         )
@@ -86,9 +92,9 @@ class TestDXPeditionService:
             mock_fetch.return_value = [
                 DXStation(
                     callsign="TEST1",
-                    name="Test Station 1",
-                    location="Test",
-                    bands=["20m"],
+                    dx_country="Test Country",
+                    spotter="Test Spotter",
+                    band="20m",
                     last_update=datetime.now(timezone.utc),
                     source="Test"
                 )
@@ -124,9 +130,9 @@ class TestDXPeditionService:
             mock_fetch.return_value = [
                 DXStation(
                     callsign="TEST1",
-                    name="Test Station 1",
-                    location="Test",
-                    bands=["20m"],
+                    dx_country="Test Country",
+                    spotter="Test Spotter",
+                    band="20m",
                     last_update=datetime.now(timezone.utc),
                     source="Test"
                 )
@@ -152,9 +158,9 @@ class TestDXPeditionService:
             mock_fetch.return_value = [
                 DXStation(
                     callsign="TEST1",
-                    name="Test Station 1",
-                    location="Test",
-                    bands=["20m"],
+                    dx_country="Test Country",
+                    spotter="Test Spotter",
+                    band="20m",
                     last_update=datetime.now(timezone.utc),
                     source="Test"
                 )
@@ -176,17 +182,18 @@ class TestDXPeditionService:
         duplicate_stations = [
             DXStation(
                 callsign="SAME1",
-                name="Station 1",
-                location="Loc1",
-                bands=["20m"],
+                dx_country="Loc1",
+                spotter="Test Spotter",
+                band="20m",
                 last_update=now - timedelta(minutes=10),
                 source="Test"
             ),
             DXStation(
                 callsign="SAME1",
-                name="Station 1 Updated",
-                location="Loc1",
-                bands=["20m"],
+                dx_country="Loc1",
+                spotter="Test Spotter",
+                band="20m",
+                comment="Station 1 Updated",
                 last_update=now - timedelta(minutes=5),
                 source="Test"
             )
@@ -194,7 +201,7 @@ class TestDXPeditionService:
         
         deduped = service.deduplicate_stations(duplicate_stations)
         assert len(deduped) == 1
-        assert deduped[0].name == "Station 1 Updated"
+        assert deduped[0].comment == "Station 1 Updated"
 
     def test_get_active_bands_empty_list(self, service):
         active = service.get_active_bands([])

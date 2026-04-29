@@ -29,7 +29,7 @@ class DXClusterFetcher(BaseFetcher):
                 if not callsign or callsign.startswith("#"):
                     continue
                 
-                name = cells[1].get_text(strip=True)
+                spotter = cells[1].get_text(strip=True)
                 location = cells[2].get_text(strip=True)
                 last_update_str = cells[3].get_text(strip=True)
                 
@@ -43,11 +43,13 @@ class DXClusterFetcher(BaseFetcher):
                 
                 stations.append(DXStation(
                     callsign=callsign,
-                    name=name,
-                    location=location,
-                    bands=[],
-                    active_band=None,
-                    active_mode=None,
+                    dx_country=location,
+                    spotter_country="",
+                    spotter=spotter,
+                    band="",
+                    frequency=None,
+                    mode="",
+                    comment="",
                     last_update=last_update,
                     source="DX Cluster"
                 ))
@@ -56,4 +58,3 @@ class DXClusterFetcher(BaseFetcher):
                 continue
         
         return stations
-

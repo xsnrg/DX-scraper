@@ -66,9 +66,11 @@ class TestMain:
         """Test main function with table output format"""
         station = DXStation(
             callsign="TEST123",
-            name="Test Station",
-            location="Test Location",
-            bands=["20m", "40m"],
+            dx_country="Test Country",
+            spotter="Test Spotter",
+            band="20m",
+            mode="SSB",
+            comment="Test Comment",
             last_update=datetime.now(timezone.utc),
             source="test_source",
             status="active"
@@ -88,7 +90,7 @@ class TestMain:
                 
                 captured = capsys.readouterr()
                 assert "TEST123" in captured.out
-                assert "Test Station" in captured.out
+                assert "Test Country" in captured.out
                 assert result == mock_summary
 
     @pytest.mark.asyncio
@@ -138,18 +140,18 @@ class TestRunWithFilter:
         """Test run_with_filter without source filter"""
         station1 = DXStation(
             callsign="TEST1",
-            name="Test 1",
-            location="Loc 1",
-            bands=[],
+            dx_country="Loc 1",
+            spotter="Spotter 1",
+            band="20m",
             last_update=datetime.now(timezone.utc),
             source="source1",
             status="active"
         )
         station2 = DXStation(
             callsign="TEST2",
-            name="Test 2",
-            location="Loc 2",
-            bands=[],
+            dx_country="Loc 2",
+            spotter="Spotter 2",
+            band="40m",
             last_update=datetime.now(timezone.utc),
             source="source2",
             status="active"
@@ -174,63 +176,22 @@ class TestRunWithFilter:
         assert len(result.stations) == 2
 
     @pytest.mark.asyncio
-    async def test_run_with_filter_no_source(self):
-        """Test run_with_filter without source filter"""
-        station1 = DXStation(
-            callsign="TEST1",
-            name="Test 1",
-            location="Loc 1",
-            bands=[],
-            last_update=datetime.now(timezone.utc),
-            source="source1",
-            status="active"
-        )
-        station2 = DXStation(
-            callsign="TEST2",
-            name="Test 2",
-            location="Loc 2",
-            bands=[],
-            last_update=datetime.now(timezone.utc),
-            source="source2",
-            status="active"
-        )
-        
-        mock_summary = DXDataSummary(
-            total_stations=2,
-            active_stations=2,
-            last_refresh=datetime.now(timezone.utc),
-            data_sources=["source1", "source2"],
-            stations=[station1, station2]
-        )
-        
-        args = MagicMock()
-        args.max_age = 3600
-        args.source = None
-        
-        with patch.object(DXPeditionService, '__init__', return_value=None):
-            with patch.object(DXPeditionService, "get_current_data", new_callable=AsyncMock, return_value=mock_summary):
-                result = await run_with_filter(args)
-        
-        assert result.total_stations == 2
-        assert len(result.stations) == 2
-
-    @pytest.mark.asyncio
     async def test_run_with_filter_source(self):
         """Test run_with_filter with source filter"""
         station1 = DXStation(
             callsign="TEST1",
-            name="Test 1",
-            location="Loc 1",
-            bands=[],
+            dx_country="Loc 1",
+            spotter="Spotter 1",
+            band="20m",
             last_update=datetime.now(timezone.utc),
             source="dx_summit",
             status="active"
         )
         station2 = DXStation(
             callsign="TEST2",
-            name="Test 2",
-            location="Loc 2",
-            bands=[],
+            dx_country="Loc 2",
+            spotter="Spotter 2",
+            band="40m",
             last_update=datetime.now(timezone.utc),
             source="dxcluster",
             status="active"
