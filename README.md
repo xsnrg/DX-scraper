@@ -10,6 +10,7 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 - **Real-Time Dashboard** — Clean web interface with auto-refresh countdown timer showing active stations, frequencies, and modes
 - **QRZ QSO Integration** — Import your QRZ.com logbook to filter and highlight stations you've contacted, with one-click sync
 - **QRZ Filter** — Toggle QRZ QSO data overlay directly from the dashboard
+- **Secure Credential Storage** — QRZ API token stored in OS keyring (Keychain/SecretService/Credential Locker), not on disk
 - **POTA Integration** — Track Parks On The Air activations with park reference links to pota.app
 - **POTA Toggle** — Enable/disable POTA data from the dashboard with one click
 - **Multi-Source Display** — See all data sources per station (e.g., "DX Summit, POTA") for data provenance
@@ -120,7 +121,11 @@ pytest tests/test_service.py -v  # single file
 | `DXPEDITION_RETRY_ATTEMPTS` | `3` | Retry attempts for failed requests |
 | `DXPEDITION_RETRY_DELAY_SECONDS` | `1.0` | Delay between retries |
 
-QRZ credentials are stored in `~/.config/dxscraper/dxscraper_config.json`, not in `.env`.
+QRZ credentials are stored as follows:
+- **Callsign** — `~/.config/dxscraper/dxscraper_config.json` (plaintext JSON, `0o600` permissions)
+- **API Token** — OS keyring (Keychain on macOS, SecretService on Linux, Credential Locker on Windows)
+
+The API token is never written to disk.
 
 ## License
 
