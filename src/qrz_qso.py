@@ -3,6 +3,7 @@ import html
 import json
 import logging
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -159,7 +160,8 @@ async def _fetch_qso_xml(session_token: str, time_on_after: Optional[str] = None
             else:
                 parts.append("OPTION=ALL")
             encoded = "&".join(parts)
-            logger.info(f"Fetch request: {encoded}")
+            redacted = re.sub(r'KEY=[^&]+', 'KEY=[REDACTED]', encoded)
+            logger.info(f"Fetch request: {redacted}")
             async with session.post(LOGBOOK_API_URL, data=encoded, headers=headers, timeout=60) as resp:
                 raw = await resp.read()
                 text = raw.decode('utf-8', errors='replace')
