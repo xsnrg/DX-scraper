@@ -15,6 +15,7 @@ class Config:
         "dx_news": {"name": "DX News", "enabled": True},
         "dx_summit": {"name": "DX Summit", "enabled": True},
         "hamqth": {"name": "HamQTH", "enabled": True},
+        "pota": {"name": "POTA", "enabled": True},
     }
     @classmethod
     def get_enabled_sources(cls):

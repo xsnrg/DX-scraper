@@ -8,7 +8,7 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 
 - **Multi-Source Aggregation** — Pulls live data from DX Summit, Spothole, DX News, HamQTH, and POTA with deduplication across sources
 - **Real-Time Dashboard** — Clean web interface with auto-refresh countdown timer showing active stations, frequencies, and modes
-- **QRZ QSO Integration** — Import your QRZ.com logbook to filter and highlight stations you've contacted, with one-click sync
+- **QRZ QSO Integration** — Import your QRZ.com logbook to filter and highlight stations you've contacted, with one-click sync and automatic token renewal when credentials expire
 - **QRZ Filter** — Toggle QRZ QSO data overlay directly from the dashboard
 - **Secure Credential Storage** — QRZ API token stored in OS keyring (Keychain/SecretService/Credential Locker), not on disk
 - **POTA Integration** — Track Parks On The Air activations with park reference links to pota.app

@@ -4,7 +4,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from .service import DXPeditionService
 from .config import Config
 from .qrz_config import save_qrz_data, get_qrz_data
-from .qrz_qso import sync_qso_data, QSO_CACHE_FILE
+from .exceptions import QRZDataError
+from .qrz_qso import sync_qso_data, QSO_CACHE_FILE, _authenticate
 from .bands import frequency_to_band
 import asyncio
 import os
@@ -31,14 +32,23 @@ async def root():
     return {"message": "DXpedition Monitor API - Frontend not found"}
 
 @app.get("/data")
-async def get_data():
+async def get_data(exclude_sources: str | None = None):
     service = DXPeditionService(Config.DATA_MAX_AGE_SECONDS)
+    if exclude_sources:
+        sources_to_exclude = [s.strip() for s in exclude_sources.split(",")]
+        service = DXPeditionService(Config.DATA_MAX_AGE_SECONDS, excluded_sources=sources_to_exclude)
     return await service.get_current_data()
 
 @app.get("/qrz-status")
 async def get_qrz_status():
     data = get_qrz_data()
-    return {"callsign": data.get("callsign", ""), "token": data.get("token", "")}
+    callsign = data.get("callsign", "")
+    token = data.get("token", "")
+    return {
+        "callsign": callsign,
+        "has_credentials": bool(callsign and token),
+        "token_masked": "****" + token[-4:] if len(token) > 4 else "****",
+    }
 
 @app.post("/qrz-token")
 async def set_qrz_token(body: dict):
@@ -46,8 +56,12 @@ async def set_qrz_token(body: dict):
     token = body.get("token", "")
     if not callsign or not token:
         raise HTTPException(status_code=400, detail="callsign and token are required")
+    try:
+        await _authenticate(callsign, token)
+    except QRZDataError as e:
+        raise HTTPException(status_code=422, detail=f"Token validation failed: {e}")
     save_qrz_data(callsign, token)
-    return {"status": "ok"}
+    return {"status": "ok", "validated": True}
 
 
 @app.get("/qrz-sync")

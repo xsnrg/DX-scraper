@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class DXPeditionService:
-    def __init__(self, max_age_seconds: int = 3600):
+    def __init__(self, max_age_seconds: int = 3600, excluded_sources: Optional[List[str]] = None):
         self.max_age_seconds = max_age_seconds
+        self.excluded_sources = excluded_sources or []
 
     def filter_by_age(self, stations: List[DXStation]) -> List[DXStation]:
         cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=self.max_age_seconds)
@@ -33,7 +34,10 @@ class DXPeditionService:
             else:
                 sources[station.callsign].add(station.source)
                 existing = seen[station.callsign]
-                if self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
+                # Prefer POTA data when available
+                if station.source == "POTA" and existing.source != "POTA":
+                    seen[station.callsign] = station
+                elif self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
                     seen[station.callsign] = station
         
         for callsign in seen:
@@ -55,7 +59,7 @@ class DXPeditionService:
         
         try:
             async with aiohttp.ClientSession() as session:
-                stations = await fetch_all_data(session)
+                stations = await fetch_all_data(session, self.excluded_sources)
 
             stations = self.filter_by_age(stations)
             stations = self.deduplicate_stations(stations)

@@ -25,6 +25,15 @@
             </div>
             <div class="flex items-center gap-3">
                 <div class="flex flex-col items-center">
+                    <button @click="togglePota"
+                            :class="potaEnabled ? 'bg-purple-600 hover:bg-purple-700' : 'bg-slate-600 hover:bg-slate-700'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                        <i class="fas" :class="potaEnabled ? 'fa-check-circle' : 'fa-circle'"></i>
+                        {{ potaEnabled ? 'POTA enabled' : 'Activate POTA' }}
+                    </button>
+                    <div class="text-xs text-transparent mt-1">POTA</div>
+                </div>
+                <div class="flex flex-col items-center">
                     <button @click="syncQrzData" 
                             :class="syncStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
                             class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -115,7 +124,16 @@
                                     {{ station.callsign }}
                                 </a>
                             </td>
-                            <td class="px-6 py-4">{{ station.dx_country }}</td>
+                            <td class="px-6 py-4">
+                                <template v-if="station.pota_reference">
+                                    <a :href="`https://pota.app/#/park/${station.pota_reference}`" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
+                                        {{ station.dx_country }}
+                                    </a>
+                                </template>
+                                <template v-else>
+                                    {{ station.dx_country }}
+                                </template>
+                            </td>
                             <td class="px-6 py-4">{{ station.spotter_country || station.spotter }}</td>
                             <td class="px-6 py-4">{{ station.band || '-' }}</td>
                             <td class="px-6 py-4 text-sm font-mono">
@@ -175,6 +193,9 @@
                 <h2 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
                     <i class="fas fa-key"></i> QRZ.com API Credentials
                 </h2>
+                <div v-if="needsRenewal" class="bg-amber-900/30 border border-amber-600/50 text-amber-300 p-3 rounded-lg text-sm mb-4">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Your QRZ token appears to be expired. Please enter a new token below.
+                </div>
                 <div class="space-y-4">
                     <div v-if="showCallsignField">
                         <label class="block text-sm text-slate-400 mb-1">Callsign</label>
@@ -220,9 +241,11 @@
                 const showCallsignField = ref(true);
                 const showTokenField = ref(true);
                 const syncStatus = ref('idle');
+                const needsRenewal = ref(false);
                 let syncTimeout = null;
                 const nextRefreshTime = ref(new Date(Date.now() + 5 * 60 * 1000));
                 const qrzFilterEnabled = ref(localStorage.getItem('qrzFilterEnabled') === 'true');
+                const potaEnabled = ref(localStorage.getItem('potaEnabled') !== 'false');
                 const qrzCacheData = ref([]);
                 const qrzCacheMap = ref(new Map());
                 const qrzCacheInfo = ref({ exists: false, count: 0, last_modified: '' });
@@ -252,6 +275,12 @@
                 const toggleQrzFilter = () => {
                     qrzFilterEnabled.value = !qrzFilterEnabled.value;
                     localStorage.setItem('qrzFilterEnabled', qrzFilterEnabled.value.toString());
+                };
+
+                const togglePota = () => {
+                    potaEnabled.value = !potaEnabled.value;
+                    localStorage.setItem('potaEnabled', potaEnabled.value.toString());
+                    fetchData();
                 };
 
                 const getQrzRowClass = (station) => {
@@ -311,7 +340,7 @@
                         const resp = await fetch('/qrz-status');
                         if (resp.ok) {
                             const data = await resp.json();
-                            qrzReady.value = !!(data.callsign && data.token);
+                            qrzReady.value = data.has_credentials;
                         }
                     } catch {
                         qrzReady.value = false;
@@ -320,7 +349,7 @@
 
                 const columns = [
                     { key: 'callsign', label: 'DX Callsign' },
-                    { key: 'dx_country', label: 'DX Country' },
+                    { key: 'dx_country', label: 'DX Location' },
                     { key: 'spotter_country', label: 'Spotter' },
                     { key: 'band', label: 'Band' },
                     { key: 'frequency', label: 'Frequency' },
@@ -333,7 +362,11 @@
                     loading.value = true;
                     error.value = null;
                     try {
-                        const response = await fetch('/data');
+                        let url = '/data';
+                        if (!potaEnabled.value) {
+                            url += '?exclude_sources=POTA';
+                        }
+                        const response = await fetch(url);
                         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                         summary.value = await response.json();
                         summary.value.last_refresh = new Date().toISOString();
@@ -465,13 +498,14 @@
                     showTokenField.value = true;
                     qrzCallsign.value = '';
                     qrzToken.value = '';
+                    needsRenewal.value = false;
                     checkQrzStatus().then(() => {
                         if (qrzReady.value) {
                             fetch('/qrz-status').then(r => r.json()).then(data => {
                                 qrzCallsign.value = data.callsign || '';
-                                qrzToken.value = data.token || '';
+                                qrzToken.value = '';
                                 showCallsignField.value = !!(data.callsign);
-                                showTokenField.value = !!(data.token);
+                                showTokenField.value = true;
                             });
                         }
                     });
@@ -492,11 +526,27 @@
                                 token: qrzToken.value
                             })
                         });
-                        if (!resp.ok) throw new Error('Failed to save');
+                        if (!resp.ok) {
+                            const err = await resp.json();
+                            throw new Error(err.detail || 'Failed to save');
+                        }
                         qrzReady.value = true;
                         closeModal();
-                    } catch {
-                        // silently fail
+                        await loadQrzCache();
+                        const syncResp = await fetch('/qrz-sync');
+                        const syncData = await syncResp.json();
+                        if (syncData.status === 'ok') {
+                            syncStatus.value = 'success';
+                            qrzCacheInfo.value.last_modified = new Date().toLocaleString(undefined, { hour12: false });
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
+                        } else {
+                            syncStatus.value = 'error';
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                        }
+                    } catch (e) {
+                        // show error to user
                     } finally {
                         saving.value = false;
                     }
@@ -518,6 +568,12 @@
                             qrzCacheInfo.value.last_modified = new Date().toLocaleString(undefined, { hour12: false });
                             clearTimeout(syncTimeout);
                             syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
+                        } else if (data.needs_renewal) {
+                            syncStatus.value = 'error';
+                            needsRenewal.value = true;
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                            showQrzModal();
                         } else {
                             syncStatus.value = 'error';
                             clearTimeout(syncTimeout);
@@ -538,9 +594,9 @@
                     showModal, showQrzModal, closeModal, saveQrzToken,
                     saving, qrzCallsign, qrzToken, qrzReady,
                     showCallsignField, showTokenField,
-                    syncStatus, syncQrzData,
+                    syncStatus, syncQrzData, needsRenewal,
                     qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
-                    getQrzRowClass, nextRefreshTime
+                    getQrzRowClass, nextRefreshTime, potaEnabled, togglePota
                 };
             }
         }).mount('#app');

@@ -9,8 +9,9 @@ from typing import Optional
 from src.models import DXDataSummary
 from src.service import DXPeditionService
 from src.config import Config
-from src.qrz_qso import sync_qso_data, LOG_FILE
-from src.qrz_config import get_qrz_data
+from src.exceptions import QRZDataError
+from src.qrz_qso import sync_qso_data, LOG_FILE, _authenticate
+from src.qrz_config import get_qrz_data, save_qrz_data
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,6 +51,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
                         "last_update": s.last_update.isoformat(),
                         "source": s.source,
                         "sources": s.sources,
+                        "pota_reference": s.pota_reference,
                         "status": s.status
                     }
                     for s in summary.stations
@@ -136,6 +138,40 @@ async def _debug_qrz():
         print("=== Check log file for details: ===")
         print(f"  cat {LOG_FILE}")
         sys.exit(1)
+    
+    if result.get("status") == "error" and result.get("needs_renewal"):
+        print()
+        print("=== Token appears to be expired or invalid ===")
+        print(f"Current callsign: {callsign}")
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            new_token = input(f"Enter new QRZ token (attempt {attempt}/{max_attempts}, or 'q' to quit): ").strip()
+            if new_token.lower() == 'q':
+                print("Aborted.")
+                sys.exit(0)
+            if not new_token:
+                print("Token cannot be empty.")
+                continue
+            try:
+                await _authenticate(callsign, new_token)
+                save_qrz_data(callsign, new_token)
+                print("Token saved successfully!")
+                print()
+                print("=== Step 2: Syncing with new token ===")
+                result = await sync_qso_data(callsign, new_token)
+                print(f"Result: {json.dumps(result, indent=2)}")
+                if result.get("status") == "ok":
+                    print("\nSync completed successfully.")
+                else:
+                    print(f"\nSync failed: {result.get('error', 'unknown error')}")
+                break
+            except QRZDataError as e:
+                print(f"Token validation failed: {e}")
+                if attempt < max_attempts:
+                    print("Try again or enter a different token.\n")
+                else:
+                    print("\nMax attempts reached. Token was not updated.")
+                    sys.exit(1)
 
 
 if __name__ == "__main__":

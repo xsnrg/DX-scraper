@@ -351,7 +351,7 @@ async def sync_qso_data(callsign: str, token: str) -> dict:
     try:
         session_token = await _authenticate(callsign, token)
     except QRZDataError as e:
-        return {'status': 'error', 'error': str(e)}
+        return {'status': 'error', 'error': str(e), 'needs_renewal': True}
 
     try:
         if not cache_exists:
