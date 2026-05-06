@@ -84,7 +84,7 @@
         <div v-if="summary" class="bg-slate-800 p-4 rounded-t-xl border-x border-t border-slate-700 flex flex-col md:flex-row gap-4 items-center justify-between">
             <div class="relative w-full md:w-[30rem]">
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
-                <input v-model="searchQuery" type="text" placeholder="Search callsign, DX country, spotter or frequency..." 
+                <input v-model="searchQuery" type="text" placeholder="Search... (comma=AND pipe=OR)" 
                        class="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
             </div>
             
@@ -417,17 +417,20 @@
                         }
                         if (searchQuery.value) {
                             const q = searchQuery.value.toLowerCase();
-                            data = data.filter(s => 
-                                (s.callsign && s.callsign.toLowerCase().includes(q)) || 
-                                (s.dx_country && s.dx_country.toLowerCase().includes(q)) ||
-                                (s.spotter_country && s.spotter_country.toLowerCase().includes(q)) ||
-                                (s.spotter && s.spotter.toLowerCase().includes(q)) ||
-                                (s.band && s.band.toLowerCase().includes(q)) ||
-                                (s.mode && s.mode.toLowerCase().includes(q)) ||
-                                (s.comment && s.comment.toLowerCase().includes(q)) ||
-                                (s.source && s.source.toLowerCase().includes(q)) ||
-                                (s.frequency && s.frequency.toString().toLowerCase().includes(q))
-                            );
+                            // Split by pipe for OR groups, then by comma for AND within each group
+                            const orGroups = q.split('|').map(g => g.split(',').map(t => t.trim()).filter(Boolean));
+                            data = data.filter(s => {
+                                const searchable = [
+                                    s.callsign, s.dx_country, s.spotter_country, s.spotter,
+                                    s.band, s.mode, s.comment, s.source, s.frequency
+                                ].filter(Boolean).map(v => v.toString().toLowerCase());
+                                // Each OR group: at least one AND group must match
+                                return orGroups.some(andGroup => 
+                                    andGroup.every(term => 
+                                        searchable.some(field => field.includes(term))
+                                    )
+                                );
+                            });
                         }
                         data.sort((a, b) => {
                             let valA = a[sortKey.value];
