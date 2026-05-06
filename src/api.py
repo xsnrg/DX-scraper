@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from .service import DXPeditionService
 from .config import Config
-from .qrz_config import save_qrz_data, get_qrz_data
+from .qrz_config import save_qrz_data, get_qrz_data, QRZConfigError
 from .exceptions import QRZDataError
 from .qrz_qso import sync_qso_data, QSO_CACHE_FILE, _authenticate
 from .bands import frequency_to_band
@@ -44,10 +44,12 @@ async def get_qrz_status():
     data = get_qrz_data()
     callsign = data.get("callsign", "")
     token = data.get("token", "")
+    keyring_unavailable = data.get("keyring_unavailable", False)
     return {
         "callsign": callsign,
         "has_credentials": bool(callsign and token),
         "token_masked": "****" + token[-4:] if len(token) > 4 else "****",
+        "keyring_unavailable": keyring_unavailable,
     }
 
 @app.post("/qrz-token")
@@ -60,7 +62,10 @@ async def set_qrz_token(body: dict):
         await _authenticate(callsign, token)
     except QRZDataError as e:
         raise HTTPException(status_code=422, detail=f"Token validation failed: {e}")
-    save_qrz_data(callsign, token)
+    try:
+        save_qrz_data(callsign, token)
+    except QRZConfigError as e:
+        raise HTTPException(status_code=500, detail=f"Credentials saved but config error: {e}")
     return {"status": "ok", "validated": True}
 
 

@@ -11,7 +11,7 @@ from src.service import DXPeditionService
 from src.config import Config
 from src.exceptions import QRZDataError
 from src.qrz_qso import sync_qso_data, LOG_FILE, _authenticate
-from src.qrz_config import get_qrz_data, save_qrz_data
+from src.qrz_config import get_qrz_data, save_qrz_data, QRZConfigError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -118,6 +118,9 @@ async def _debug_qrz():
     callsign = data.get("callsign", "")
     token = data.get("token", "")
     
+    if data.get("keyring_unavailable"):
+        print("WARNING: System keyring is unavailable. Token may not be stored correctly.")
+    
     if not callsign or not token:
         print("ERROR: No QRZ credentials found in", get_qrz_data.__module__)
         print("Store them with: python -m src.main --debug-qrz (via the web UI)")
@@ -172,6 +175,9 @@ async def _debug_qrz():
                 else:
                     print("\nMax attempts reached. Token was not updated.")
                     sys.exit(1)
+            except QRZConfigError as e:
+                print(f"Config error: {e}")
+                sys.exit(1)
 
 
 if __name__ == "__main__":
