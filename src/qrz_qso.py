@@ -39,11 +39,11 @@ _setup_logging()
 
 
 class QSORecord:
-    __slots__ = ['call', 'time_on', 'time_off', 'freq', 'mode', 'rst_sent', 'rst_recv', 'grid', 'notes', 'country', 'dxcc']
+    __slots__ = ['call', 'time_on', 'time_off', 'freq', 'mode', 'rst_sent', 'rst_recv', 'grid', 'notes', 'country', 'dxcc', 'app_qrzlog_status']
 
     def __init__(self, call: str, time_on: str, time_off: str = "", freq: str = "",
                  mode: str = "", rst_sent: str = "", rst_recv: str = "", grid: str = "", notes: str = "",
-                 country: str = "", dxcc: str = ""):
+                 country: str = "", dxcc: str = "", app_qrzlog_status: str = ""):
         self.call = call
         self.time_on = time_on
         self.time_off = time_off
@@ -55,6 +55,7 @@ class QSORecord:
         self.notes = notes
         self.country = country
         self.dxcc = dxcc
+        self.app_qrzlog_status = app_qrzlog_status
 
     def to_dict(self) -> dict:
         return {
@@ -69,6 +70,7 @@ class QSORecord:
             'notes': self.notes,
             'country': self.country,
             'dxcc': self.dxcc,
+            'app_qrzlog_status': self.app_qrzlog_status,
         }
 
     @classmethod
@@ -85,6 +87,7 @@ class QSORecord:
             notes=d.get('notes', ''),
             country=d.get('country', ''),
             dxcc=d.get('dxcc', ''),
+            app_qrzlog_status=d.get('app_qrzlog_status', ''),
         )
 
     @classmethod
@@ -254,6 +257,10 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
                 record.country = value
             elif field_name == 'dxcc':
                 record.dxcc = value
+            elif field_name == 'qsl_rcvd':
+                pass  # qsl_rcvd is deprecated, use app_qrzlog_status instead
+            elif field_name == 'app_qrzlog_status':
+                record.app_qrzlog_status = value
         
         for match in closing_tag_pattern.finditer(raw):
             field_name = match.group(1).lower()
@@ -283,6 +290,10 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
                 record.country = value
             elif field_name == 'dxcc' and not record.dxcc:
                 record.dxcc = value
+            elif field_name == 'qsl_rcvd':
+                pass  # qsl_rcvd is deprecated, use app_qrzlog_status instead
+            elif field_name == 'app_qrzlog_status' and not record.app_qrzlog_status:
+                record.app_qrzlog_status = value
         
         for match in self_closing_tag_pattern.finditer(raw):
             field_name = match.group(1).lower()

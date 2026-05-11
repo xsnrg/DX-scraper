@@ -111,3 +111,36 @@ async def qrz_cache():
             pass
     last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
     return {"data": pairs, "exists": True, "count": len(pairs), "last_modified": last_modified}
+
+
+@app.get("/qrz-qso-data")
+async def qrz_qso_data():
+    import json
+    if not QSO_CACHE_FILE.exists():
+        return {"data": [], "exists": False, "count": 0}
+    records = []
+    for line in QSO_CACHE_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+            records.append({
+                "call": d.get("call", ""),
+                "country": d.get("country", ""),
+                "dxcc": d.get("dxcc", ""),
+                "app_qrzlog_status": d.get("app_qrzlog_status", ""),
+                "time_on": d.get("time_on", ""),
+                "freq": d.get("freq", ""),
+                "mode": d.get("mode", ""),
+            })
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return {"data": records, "exists": True, "count": len(records)}
+
+
+@app.get("/dxcc-map.html")
+async def dxcc_map():
+    if os.path.exists("src/web/dxcc-map.html"):
+        return FileResponse("src/web/dxcc-map.html")
+    return {"message": "DXCC map not found"}

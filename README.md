@@ -2,7 +2,9 @@
 
 A real-time monitoring tool for tracking active DXpeditions across various amateur radio data sources. Aggregates data from DX Summit, Spothole (DX Cluster), DX News, HamQTH, and POTA into a unified dashboard with QRZ.com QSO history integration.
 
-![DXpedition Monitor Dashboard](screenshot.png)
+![DXpedition Monitor Dashboard](dashboard-screenshot.png)
+
+![DXCC QSL Status Map](dxcc-map-screenshot.png)
 
 ## Features
 
@@ -10,6 +12,7 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 - **Real-Time Dashboard** — Clean web interface with auto-refresh countdown timer showing active stations, frequencies, and modes
 - **QRZ QSO Integration** — Import your QRZ.com logbook to filter and highlight stations you've contacted, with one-click sync and automatic token renewal when credentials expire
 - **QRZ Filter** — Toggle QRZ QSO data overlay directly from the dashboard
+- **DXCC QSL Map** — Interactive Leaflet map showing confirmed countries from your QRZ logbook with color-coded markers
 - **Secure Credential Storage** — QRZ API token stored in OS keyring (Keychain/SecretService/Credential Locker), not on disk
 - **POTA Integration** — Track Parks On The Air activations with park reference links to pota.app
 - **POTA Toggle** — Enable/disable POTA data from the dashboard with one click
@@ -111,6 +114,7 @@ pytest tests/test_service.py -v  # single file
 | `POST` | `/qrz-token` | Store QRZ.com API credentials |
 | `GET` | `/qrz-sync` | Sync QRZ logbook data |
 | `GET` | `/qrz-cache` | Cached QRZ QSO data |
+| `GET` | `/dxcc-map` | DXCC QSL status map |
 
 ## Configuration
 

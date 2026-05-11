@@ -21,7 +21,7 @@
                 <a href="https://github.com/xsnrg/DX-scraper" target="_blank" class="text-3xl font-bold text-blue-400 flex items-center gap-3 hover:text-blue-300 transition-colors">
                     <i class="fas fa-broadcast-tower"></i> DXpedition Monitor
                 </a>
-                <p class="text-slate-400 mt-1">Real-time tracking of active DX expeditions</p>
+                <p class="text-slate-400 mt-1">Tracking of active DX spots</p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="flex flex-col items-center">
@@ -41,7 +41,7 @@
                         <i class="fas" :class="syncStatus === 'syncing' ? 'fa-spinner fa-spin' : qrzReady ? 'fa-key' : 'fa-plug'"></i>
                         {{ syncStatus === 'syncing' ? 'Syncing QRZ...' : syncStatus === 'success' ? 'Synced!' : syncStatus === 'error' ? 'Sync Failed' : qrzReady ? 'Refresh QRZ Data' : 'Setup QRZ' }}
                     </button>
-                    <div class="text-xs text-slate-500 mt-1">{{ qrzCacheInfo.last_modified ? 'Last synced: ' + qrzCacheInfo.last_modified : '' }}</div>
+                    <div class="text-xs text-slate-500 mt-1">{{ qrzCacheInfo.last_modified ? 'synced ' + qrzCacheInfo.last_modified : '' }}</div>
                 </div>
                 <div class="flex flex-col items-center">
                     <button @click="toggleQrzFilter"
@@ -60,6 +60,14 @@
                         {{ loading ? 'Updating...' : 'Refresh Data' }}
                     </button>
                     <div class="text-xs text-slate-500 mt-1">Refresh in {{ countdownText }}</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <a href="/dxcc-map.html" 
+                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                        <i class="fas fa-map-marked-alt"></i>
+                        Map my QSOs
+                    </a>
+                    <div class="text-xs text-transparent mt-1">Map</div>
                 </div>
             </div>
         </header>

@@ -61,7 +61,7 @@ class TestQSORecord:
     def test_from_dict_roundtrip(self):
         d = {'call': 'AB1CD', 'time_on': '2024-01-01T00:00:00Z', 'freq': '14.200', 'mode': 'CW',
              'time_off': '', 'rst_sent': '59', 'rst_recv': '59', 'grid': 'DM43', 'notes': '',
-             'country': '', 'dxcc': ''}
+             'country': '', 'dxcc': '', 'app_qrzlog_status': ''}
         rec = QSORecord.from_dict(d)
         assert rec.to_dict() == d
 
@@ -191,6 +191,30 @@ class TestParseQSOXML:
         assert len(records) == 1
         assert records[0].country == 'United States'
         assert records[0].dxcc == '291'
+
+    def test_parse_adif_with_app_qrzlog_status_confirmed(self):
+        adif = '<call:5>AB1CD<time_on:6>143000<qso_date:8>20240115<app_qrzlog_status:1>C<EOR>'
+        records = _parse_qso_xml(adif)
+        assert len(records) == 1
+        assert records[0].app_qrzlog_status == 'C'
+
+    def test_parse_adif_with_app_qrzlog_status_not_confirmed(self):
+        adif = '<call:5>AB1CD<time_on:6>143000<qso_date:8>20240115<app_qrzlog_status:1>N<EOR>'
+        records = _parse_qso_xml(adif)
+        assert len(records) == 1
+        assert records[0].app_qrzlog_status == 'N'
+
+    def test_parse_adif_with_app_qrzlog_status_length_tag(self):
+        adif = '<call:5>AB1CD<time_on:6>143000<qso_date:8>20240115<app_qrzlog_status:1>C<EOR>'
+        records = _parse_qso_xml(adif)
+        assert len(records) == 1
+        assert records[0].app_qrzlog_status == 'C'
+
+    def test_parse_adif_with_app_qrzlog_status_closing_tag(self):
+        adif = '<call>AB1CD</call><time_on>143000</time_on><qso_date>20240115</qso_date><app_qrzlog_status>C</app_qrzlog_status><EOR>'
+        records = _parse_qso_xml(adif)
+        assert len(records) == 1
+        assert records[0].app_qrzlog_status == 'C'
 
     def test_parse_adif_special_chars_in_value(self):
         adif = '<call>AB1/CD</call><time_on>143000</time_on><qso_date>20240115</qso_date><notes>Test &amp; more</notes><EOR>'
