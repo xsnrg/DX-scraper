@@ -39,10 +39,11 @@ _setup_logging()
 
 
 class QSORecord:
-    __slots__ = ['call', 'time_on', 'time_off', 'freq', 'mode', 'rst_sent', 'rst_recv', 'grid', 'notes']
+    __slots__ = ['call', 'time_on', 'time_off', 'freq', 'mode', 'rst_sent', 'rst_recv', 'grid', 'notes', 'country', 'dxcc']
 
     def __init__(self, call: str, time_on: str, time_off: str = "", freq: str = "",
-                 mode: str = "", rst_sent: str = "", rst_recv: str = "", grid: str = "", notes: str = ""):
+                 mode: str = "", rst_sent: str = "", rst_recv: str = "", grid: str = "", notes: str = "",
+                 country: str = "", dxcc: str = ""):
         self.call = call
         self.time_on = time_on
         self.time_off = time_off
@@ -52,6 +53,8 @@ class QSORecord:
         self.rst_recv = rst_recv
         self.grid = grid
         self.notes = notes
+        self.country = country
+        self.dxcc = dxcc
 
     def to_dict(self) -> dict:
         return {
@@ -64,6 +67,8 @@ class QSORecord:
             'rst_recv': self.rst_recv,
             'grid': self.grid,
             'notes': self.notes,
+            'country': self.country,
+            'dxcc': self.dxcc,
         }
 
     @classmethod
@@ -78,6 +83,8 @@ class QSORecord:
             rst_recv=d.get('rst_recv', ''),
             grid=d.get('grid', ''),
             notes=d.get('notes', ''),
+            country=d.get('country', ''),
+            dxcc=d.get('dxcc', ''),
         )
 
     @classmethod
@@ -243,6 +250,10 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
                 record.notes = value
             elif field_name == 'qso_date':
                 qso_date = value
+            elif field_name == 'country':
+                record.country = value
+            elif field_name == 'dxcc':
+                record.dxcc = value
         
         for match in closing_tag_pattern.finditer(raw):
             field_name = match.group(1).lower()
@@ -268,6 +279,10 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
                 record.notes = value
             elif field_name == 'qso_date' and not qso_date:
                 qso_date = value
+            elif field_name == 'country' and not record.country:
+                record.country = value
+            elif field_name == 'dxcc' and not record.dxcc:
+                record.dxcc = value
         
         for match in self_closing_tag_pattern.finditer(raw):
             field_name = match.group(1).lower()
@@ -293,6 +308,10 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
                 record.notes = value
             elif field_name == 'qso_date' and not qso_date:
                 qso_date = value
+            elif field_name == 'station_country' and not record.country:
+                record.country = value
+            elif field_name == 'dxcc' and not record.dxcc:
+                record.dxcc = value
         
         if qso_date and record.time_on:
             if len(qso_date) >= 8:

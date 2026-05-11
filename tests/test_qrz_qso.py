@@ -47,6 +47,8 @@ class TestQSORecord:
         assert rec.rst_recv == ''
         assert rec.grid == ''
         assert rec.notes == ''
+        assert rec.country == ''
+        assert rec.dxcc == ''
 
     def test_to_dict(self):
         rec = QSORecord(call='AB1CD', time_on='2024-01-01T00:00:00Z', freq='14.200', mode='CW')
@@ -58,7 +60,8 @@ class TestQSORecord:
 
     def test_from_dict_roundtrip(self):
         d = {'call': 'AB1CD', 'time_on': '2024-01-01T00:00:00Z', 'freq': '14.200', 'mode': 'CW',
-             'time_off': '', 'rst_sent': '59', 'rst_recv': '59', 'grid': 'DM43', 'notes': ''}
+             'time_off': '', 'rst_sent': '59', 'rst_recv': '59', 'grid': 'DM43', 'notes': '',
+             'country': '', 'dxcc': ''}
         rec = QSORecord.from_dict(d)
         assert rec.to_dict() == d
 
@@ -170,6 +173,24 @@ class TestParseQSOXML:
         assert r.rst_recv == '59'
         assert r.grid == 'DM4321'
         assert r.notes == 'DXpedition test'
+
+    def test_parse_adif_with_country_and_dxcc(self):
+        adif = (
+            '<call>AB1CD</call><time_on>143000</time_on><qso_date>20240115</qso_date>'
+            '<country>United States</country><dxcc>291</dxcc><EOR>'
+        )
+        records = _parse_qso_xml(adif)
+        assert len(records) == 1
+        assert records[0].call == 'AB1CD'
+        assert records[0].country == 'United States'
+        assert records[0].dxcc == '291'
+
+    def test_parse_adif_with_country_and_dxcc_length_tags(self):
+        adif = '<call:5>AB1CD<time_on:6>143000<qso_date:8>20240115<country:15>United States<dxcc:3>291<EOR>'
+        records = _parse_qso_xml(adif)
+        assert len(records) == 1
+        assert records[0].country == 'United States'
+        assert records[0].dxcc == '291'
 
     def test_parse_adif_special_chars_in_value(self):
         adif = '<call>AB1/CD</call><time_on>143000</time_on><qso_date>20240115</qso_date><notes>Test &amp; more</notes><EOR>'
