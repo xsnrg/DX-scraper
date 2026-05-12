@@ -257,6 +257,7 @@
                 const qrzCacheData = ref([]);
                 const qrzCacheMap = ref(new Map());
                 const qrzCacheInfo = ref({ exists: false, count: 0, last_modified: '' });
+                const qrzAllBands = ref(new Map());
 
                 const loadQrzCache = async () => {
                     try {
@@ -278,6 +279,21 @@
                         qrzCacheMap.value = new Map();
                         qrzCacheInfo.value = { exists: false, count: 0, last_modified: '' };
                     }
+                    try {
+                        const resp = await fetch('/qrz-all-data');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const map = new Map();
+                            for (const [call, band, status] of (data.data || [])) {
+                                const key = call.toUpperCase();
+                                if (!map.has(key)) map.set(key, new Set());
+                                map.get(key).add(band.toUpperCase());
+                            }
+                            qrzAllBands.value = map;
+                        }
+                    } catch {
+                        qrzAllBands.value = new Map();
+                    }
                 };
 
                 const toggleQrzFilter = () => {
@@ -292,26 +308,33 @@
                 };
 
                 const getQrzRowClass = (station) => {
-                    if (!qrzFilterEnabled.value || !qrzCacheData.value.length) return '';
+                    if (!qrzFilterEnabled.value) return '';
+                    
+                    // POTA exception: always display normally when POTA is active
+                    if (station.source === 'POTA' && potaEnabled.value) return '';
+                    
                     const call = station.callsign.toUpperCase();
                     const stationBands = getStationBands(station);
-                    let status = 'none';
-                    for (const [qrzCall, qrzBand] of qrzCacheData.value) {
-                        if (qrzCall === call) {
-                            if (stationBands.includes(qrzBand)) {
-                                status = 'exact';
-                            } else if (status !== 'exact') {
-                                status = 'different_band';
-                            }
+                    
+                    // Check confirmed bands first (same band = hidden by filter, but safe fallback)
+                    const confirmedBands = qrzCacheMap.value.get(call);
+                    if (confirmedBands) {
+                        for (const b of stationBands) {
+                            if (confirmedBands.has(b)) return '';
                         }
                     }
-                    if (status === 'exact' && qrzFilterEnabled.value) return '';
-                    if (status === 'different_band') return 'bg-amber-900/20';
+                    
+                    // Any QSO exists (confirmed or not) on any band = amber
+                    const allBands = qrzAllBands.value.get(call);
+                    if (allBands) {
+                        return 'bg-amber-900/20';
+                    }
+                    
                     return '';
                 };
 
                 const getStationBands = (station) => {
-                    if (station.bands && station.bands.length) return station.bands.map(b => b.toUpperCase());
+                    if (station.band) return [station.band.toUpperCase()];
                     if (station.frequency) {
                         const freq = parseFloat(station.frequency);
                         if (!isNaN(freq)) {
@@ -402,7 +425,7 @@
                         if (qrzFilterEnabled.value && qrzCacheMap.value && qrzCacheMap.value.size) {
                             const sCall = (s) => s.callsign.toUpperCase();
                             const sBands = (s) => {
-                                if (s.bands && s.bands.length) return s.bands.map(b => b.toUpperCase());
+                                if (s.band) return [s.band.toUpperCase()];
                                 if (s.frequency) {
                                     const freq = parseFloat(s.frequency);
                                     if (!isNaN(freq)) {
@@ -413,6 +436,8 @@
                                 return [];
                             };
                             data = data.filter(s => {
+                                // POTA exception: never filter out POTA spots
+                                if (s.source === 'POTA' && potaEnabled.value) return true;
                                 const call = sCall(s);
                                 const bands = sBands(s);
                                 const qBands = qrzCacheMap.value.get(call);
