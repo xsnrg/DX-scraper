@@ -104,3 +104,54 @@ def test_qrz_cache_with_file(tmp_path, monkeypatch):
     assert data["exists"] is True
     assert data["count"] == 2
     assert "last_modified" in data
+
+
+def test_dxcc_map_page():
+    """Test the DXCC map page endpoint."""
+    response = client.get("/dxcc-map.html")
+    assert response.status_code == 200
+    assert "leaflet" in response.text
+    assert "DXCC" in response.text
+
+
+def test_dxcc_countries_js_file():
+    """Test the DXCC countries data file is served correctly."""
+    response = client.get("/static/dxcc-countries.js")
+    assert response.status_code == 200
+    assert "DXCC_COUNTRIES" in response.text
+    assert "Alaska" in response.text
+    assert "United Nations HQ" in response.text
+
+
+def test_dxcc_countries_js_has_entries():
+    """Test the DXCC countries file has a reasonable number of entries."""
+    response = client.get("/static/dxcc-countries.js")
+    assert response.status_code == 200
+    # Count lines that define country entries
+    entry_count = response.text.count("{name:")
+    assert entry_count > 300
+    assert entry_count < 400
+
+
+def test_hawaii_has_dxcc_110():
+    """Test that Hawaii is always DXCC 110 in the countries data."""
+    response = client.get("/static/dxcc-countries.js")
+    assert response.status_code == 200
+    # Extract Hawaii entry and verify DXCC number
+    lines = response.text.split('\n')
+    hawaii_line = [l for l in lines if '"Hawaii"' in l]
+    assert len(hawaii_line) == 1, "Hawaii entry not found"
+    assert 'dxcc: "110"' in hawaii_line[0], f"Hawaii should be DXCC 110, got: {hawaii_line[0]}"
+
+
+def test_dxcc_map_html_uses_dxcc_key():
+    """Test that the DXCC map HTML uses DXCC numbers for qslData lookup, not country names."""
+    response = client.get("/dxcc-map.html")
+    assert response.status_code == 200
+    # Verify the map page uses qslData[country.dxcc] not qslData[country.name]
+    assert 'qslData[country.dxcc]' in response.text, "Map should use DXCC numbers for qslData lookup"
+    # Verify no references to qslData[country.name] which would break color sync
+    assert 'qslData[country.name]' not in response.text, "Map should not use country names for qslData lookup"
+    # Verify getCountryColor receives the country object, not just the name
+    assert 'getCountryColor(country)' in response.text, "getCountryColor should receive country object"
+    assert 'getCountryColor(country.name)' not in response.text, "getCountryColor should not receive just country name"

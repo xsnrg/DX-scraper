@@ -12,7 +12,7 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 - **Real-Time Dashboard** — Clean web interface with auto-refresh countdown timer showing active stations, frequencies, and modes
 - **QRZ QSO Integration** — Import your QRZ.com logbook to filter and highlight stations you've contacted, with one-click sync and automatic token renewal when credentials expire
 - **QRZ Filter** — Toggle QRZ QSO data overlay directly from the dashboard
-- **DXCC QSL Map** — Interactive Leaflet map showing confirmed countries from your QRZ logbook with color-coded markers
+- **DXCC QSL Map** — Interactive Leaflet map showing confirmed countries from your QRZ logbook with color-coded markers. DXCC country data sourced from Big CTY database (345 entities) with correct longitude signs.
 - **Secure Credential Storage** — QRZ API token stored in OS keyring (Keychain/SecretService/Credential Locker), not on disk
 - **POTA Integration** — Track Parks On The Air activations with park reference links to pota.app
 - **POTA Toggle** — Enable/disable POTA data from the dashboard with one click
