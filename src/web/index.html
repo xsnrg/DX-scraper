@@ -158,6 +158,7 @@
                             <td class="px-6 py-4">{{ station.spotter_country || station.spotter }}</td>
                             <td class="px-6 py-4">
                                 <span v-if="station.band" @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
+                                <span v-else-if="station.frequency" @click="searchQuery = searchQuery ? searchQuery + ',' + frequencyToBand(station.frequency) : frequencyToBand(station.frequency)" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ frequencyToBand(station.frequency) }}</span>
                                 <span v-else>-</span>
                             </td>
                             <td class="px-6 py-4 text-sm font-mono">
@@ -651,7 +652,8 @@
                     showCallsignField, showTokenField,
                     syncStatus, syncQrzData, needsRenewal,
                     qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
-                    getQrzRowClass, nextRefreshTime, potaEnabled, togglePota
+                    getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
+                    frequencyToBand
                 };
             }
         }).mount('#app');
