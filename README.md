@@ -16,6 +16,7 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 - **Secure Credential Storage** — QRZ API token stored in OS keyring (Keychain/SecretService/Credential Locker), not on disk
 - **POTA Integration** — Track Parks On The Air activations with park reference links to pota.app
 - **POTA Toggle** — Enable/disable POTA data from the dashboard with one click
+- **Spot Age Filter** — Filter spots by age (10/20/30/60 min) directly from the dashboard
 - **Multi-Source Display** — See all data sources per station (e.g., "DX Summit, POTA") for data provenance
 - **REST API** — FastAPI backend for easy integration with other tools
 - **CLI Tool** — Quick terminal access with JSON or table output
