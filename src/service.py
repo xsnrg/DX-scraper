@@ -34,7 +34,6 @@ class DXPeditionService:
             else:
                 sources[station.callsign].add(station.source)
                 existing = seen[station.callsign]
-                # Prefer POTA data when available
                 if station.source == "POTA" and existing.source != "POTA":
                     seen[station.callsign] = station
                 elif self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):

@@ -26,14 +26,14 @@ class QRZKeyringError(QRZConfigError):
 
 def _ensure_config_dir():
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    os.chmod(str(_CONFIG_DIR), stat.S_IRWXU)  # 0o700
+    os.chmod(str(_CONFIG_DIR), stat.S_IRWXU)
 
 
 def _ensure_config_file():
     if not _CONFIG_FILE.exists():
         _ensure_config_dir()
         _CONFIG_FILE.write_text("{}")
-        os.chmod(str(_CONFIG_FILE), stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+        os.chmod(str(_CONFIG_FILE), stat.S_IRUSR | stat.S_IWUSR)
 
 
 def _atomic_write_config(data: dict):

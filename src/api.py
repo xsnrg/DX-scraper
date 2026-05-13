@@ -12,8 +12,6 @@ import os
 
 app = FastAPI(title="DXpedition Monitor API")
 
-# Mount the web directory for static files
-# This allows the app to serve CSS/JS if they were separate files
 if os.path.exists("src/web"):
     app.mount("/static", StaticFiles(directory="src/web"), name="static")
 
@@ -26,7 +24,6 @@ async def favicon():
 
 @app.get("/")
 async def root():
-    # Serve the index.html file as the home page
     if os.path.exists("src/web/index.html"):
         return FileResponse("src/web/index.html")
     return {"message": "DXpedition Monitor API - Frontend not found"}

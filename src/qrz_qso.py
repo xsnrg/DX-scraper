@@ -159,9 +159,6 @@ async def _fetch_qso_xml(session_token: str, time_on_after: Optional[str] = None
     }
     try:
         async with aiohttp.ClientSession() as session:
-            # Build query string manually to preserve colons in OPTION values
-            # QRZ API uses colon-separated name:value pairs in OPTION (e.g., MODSINCE:2023-01-01)
-            # urllib.parse.urlencode encodes colons to %3A which QRZ doesn't decode
             parts = [f"KEY={session_token}", f"ACTION=FETCH", f"TYPE=ADIF"]
             if callsign:
                 parts.append(f"CALLSIGN={callsign}")
@@ -212,14 +209,10 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
     
     adif = adif.replace('\ufffd', '')
     
-    # Split into individual QSO records by <eor> marker (case-insensitive)
     raw_records = re.split(r'<eor>', adif, flags=re.IGNORECASE)
     
-    # Match <tag:LENGTH>value where value is exactly LENGTH chars
     tag_pattern = re.compile(r'<([a-zA-Z_][a-zA-Z0-9_]*):(\d+)>([^<]*)', re.IGNORECASE)
-    # Match <tag>value</tag> format
     closing_tag_pattern = re.compile(r'<([a-zA-Z_][a-zA-Z0-9_]*)>([^<]*)</\1>', re.IGNORECASE)
-    # Match <tag>value<tag> format (no slash in closing tag)
     self_closing_tag_pattern = re.compile(r'<([a-zA-Z_][a-zA-Z0-9_]*)>([^<]*)(?=<\1>)', re.IGNORECASE)
     
     for raw in raw_records:
@@ -258,7 +251,7 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
             elif field_name == 'dxcc':
                 record.dxcc = value
             elif field_name == 'qsl_rcvd':
-                pass  # qsl_rcvd is deprecated, use app_qrzlog_status instead
+                pass
             elif field_name == 'app_qrzlog_status':
                 record.app_qrzlog_status = value
         
@@ -291,7 +284,7 @@ def _parse_qso_xml(adif: str) -> list[QSORecord]:
             elif field_name == 'dxcc' and not record.dxcc:
                 record.dxcc = value
             elif field_name == 'qsl_rcvd':
-                pass  # qsl_rcvd is deprecated, use app_qrzlog_status instead
+                pass
             elif field_name == 'app_qrzlog_status' and not record.app_qrzlog_status:
                 record.app_qrzlog_status = value
         

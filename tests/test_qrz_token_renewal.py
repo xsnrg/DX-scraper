@@ -71,7 +71,6 @@ class TestQRZTokenValidation:
         temp_config = tmp_path / "dxscraper_config.json"
         monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
 
-        # Pre-create config with existing data
         temp_config.write_text('{"existing_field": "value"}')
 
         mock_session = self._make_mock_session('RESULT=FAIL&REASON=Expired+key')
@@ -257,7 +256,6 @@ class TestDebugQRZRenewal:
         save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
         save_qrz_data('AB1CD', 'expiredtoken')
 
-        # Mock keyring to return the saved token
         mock_keyring = MagicMock()
         mock_keyring.get_password = MagicMock(return_value='expiredtoken')
 
@@ -271,7 +269,6 @@ class TestDebugQRZRenewal:
 
         mock_sync_fn = MagicMock(side_effect=mock_sync)
 
-        # Patch where the names are used in src.main module
         with patch('src.main.sync_qso_data', mock_sync_fn):
             with patch('src.main._authenticate', AsyncMock(return_value='newtoken')):
                 with patch('src.main.save_qrz_data') as save_qrz_data_mock:
@@ -284,16 +281,13 @@ class TestDebugQRZRenewal:
                                 with patch.object(sys, 'exit'):
                                     await _debug_qrz()
 
-        # Should have called sync twice (initial + after renewal)
         assert mock_sync_fn.call_count == 2
 
-        # Should have saved the new token
         assert save_qrz_data_mock.called
         save_args = save_qrz_data_mock.call_args
         assert save_args[0][0] == 'AB1CD'
         assert save_args[0][1] == 'newtoken123'
 
-        # Should have detected expired token
         assert 'expired' in captured.getvalue().lower()
 
     @pytest.mark.asyncio
@@ -319,7 +313,6 @@ class TestDebugQRZRenewal:
                         with patch.object(sys, 'exit') as mock_exit:
                             await _debug_qrz()
 
-        # Should have exited with code 0 (user chose to quit)
         calls_with_zero = [c for c in mock_exit.call_args_list if c[0][0] == 0]
         assert len(calls_with_zero) >= 1
 
@@ -355,7 +348,6 @@ class TestDebugQRZRenewal:
                                 with patch.object(sys, 'exit'):
                                     await _debug_qrz()
 
-        # Should have called sync twice
         assert mock_sync_fn.call_count == 2
         assert save_qrz_data_mock.called
 
@@ -383,7 +375,6 @@ class TestDebugQRZRenewal:
                             with patch.object(sys, 'exit') as mock_exit:
                                 await _debug_qrz()
 
-        # Should have exited with code 1
         calls_with_one = [c for c in mock_exit.call_args_list if c[0][0] == 1]
         assert len(calls_with_one) >= 1
         assert 'Max attempts reached' in captured.getvalue()
@@ -410,6 +401,5 @@ class TestDebugQRZRenewal:
                     with patch.object(sys, 'exit'):
                         await _debug_qrz()
 
-        # Should not have prompted for renewal
         assert 'expired' not in captured.getvalue().lower()
         assert mock_sync.call_count == 1
