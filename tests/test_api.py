@@ -236,3 +236,37 @@ def test_data_endpoint_multiple_exclude_sources():
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
+
+def test_clickable_band_column_in_dashboard():
+    """Test that the Band column has clickable spans with search binding."""
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert '@click="searchQuery' in html
+    assert "station.band" in html
+    assert "cursor-pointer" in html
+
+def test_clickable_mode_column_in_dashboard():
+    """Test that the Mode column has clickable spans with search binding."""
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert "station.mode" in html
+    assert "station.comment" in html
+    assert "cursor-pointer" in html
+
+def test_clickable_dx_location_column_in_dashboard():
+    """Test that the DX Location column has clickable spans with search binding."""
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert "station.dx_country" in html
+    assert "cursor-pointer" in html
+
+def test_clear_search_button_in_dashboard():
+    """Test that the search input has a clear button."""
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert "fa-times" in html
+    assert "searchQuery = ''" in html
