@@ -106,6 +106,16 @@ pytest tests/test_service.py -v  # single file
 
 `pytest.ini` sets `asyncio_mode = auto` and `pythonpath = .`.
 
+### Acceptance Tests
+
+```bash
+export PYTHONPATH=$PYTHONPATH:.
+pytest tests/test_acceptance.py -v  # all acceptance tests (59 tests)
+pytest tests/test_acceptance.py -v -k "spot_age"  # single test
+```
+
+Acceptance tests use **pytest-playwright** (headless Chromium) to verify user-facing dashboard features. Tests cover: dashboard load, stats cards, loading/error states, search, clickable column filters, pagination, spot age filter, POTA toggle, QRZ APIs, DXCC map page, responsive layout.
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
