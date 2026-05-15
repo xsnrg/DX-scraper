@@ -677,7 +677,7 @@ def test_map_page_has_legend(page: Page):
     page.goto("http://localhost:8000/dxcc-map.html")
     expect(page.get_by_text("Confirmed (2-way QSL)")).to_be_visible()
     expect(page.get_by_text("Logged (not verified)")).to_be_visible()
-    expect(page.get_by_text("Not in cache")).to_be_visible()
+    expect(page.get_by_text("Not in cache", exact=True)).to_be_visible()
 
 
 def test_map_back_to_dashboard(page: Page):
