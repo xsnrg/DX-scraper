@@ -156,11 +156,7 @@
                                 </template>
                             </td>
                             <td class="px-6 py-4">{{ station.spotter_country || station.spotter }}</td>
-                            <td class="px-6 py-4">
-                                <span v-if="station.band" @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
-                                <span v-else-if="station.frequency" @click="searchQuery = searchQuery ? searchQuery + ',' + frequencyToBand(station.frequency) : frequencyToBand(station.frequency)" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ frequencyToBand(station.frequency) }}</span>
-                                <span v-else>-</span>
-                            </td>
+                            <td class="px-6 py-4">{{ station.band }}</td>
                             <td class="px-6 py-4 text-sm font-mono">
                                 {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : 'N/A' }}
                             </td>
@@ -354,36 +350,9 @@
 
                 const getStationBands = (station) => {
                     if (station.band) return [station.band.toUpperCase()];
-                    if (station.frequency) {
-                        const freq = parseFloat(station.frequency);
-                        if (!isNaN(freq)) {
-                            const band = frequencyToBand(freq);
-                            if (band) return [band.toUpperCase()];
-                        }
-                    }
                     return [];
                 };
 
-                const frequencyToBand = (freq) => {
-                    const bands = [
-                        { name: '160m', low: 1.8, high: 2.0 },
-                        { name: '80m', low: 3.5, high: 4.0 },
-                        { name: '40m', low: 7.0, high: 7.3 },
-                        { name: '30m', low: 10.1, high: 10.15 },
-                        { name: '20m', low: 14.0, high: 14.35 },
-                        { name: '17m', low: 18.068, high: 18.168 },
-                        { name: '15m', low: 21.0, high: 21.45 },
-                        { name: '12m', low: 24.89, high: 24.99 },
-                        { name: '10m', low: 28.0, high: 29.7 },
-                        { name: '6m', low: 50.0, high: 54.0 },
-                        { name: '2m', low: 144.0, high: 148.0 },
-                        { name: '70cm', low: 420.0, high: 450.0 },
-                    ];
-                    for (const b of bands) {
-                        if (freq >= b.low && freq <= b.high) return b.name;
-                    }
-                    return null;
-                };
 
                 const checkQrzStatus = async () => {
                     try {
@@ -450,13 +419,6 @@
                             const sCall = (s) => s.callsign.toUpperCase();
                             const sBands = (s) => {
                                 if (s.band) return [s.band.toUpperCase()];
-                                if (s.frequency) {
-                                    const freq = parseFloat(s.frequency);
-                                    if (!isNaN(freq)) {
-                                        const band = frequencyToBand(freq);
-                                        if (band) return [band.toUpperCase()];
-                                    }
-                                }
                                 return [];
                             };
                             data = data.filter(s => {
@@ -653,7 +615,6 @@
                     syncStatus, syncQrzData, needsRenewal,
                     qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
                     getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
-                    frequencyToBand
                 };
             }
         }).mount('#app');

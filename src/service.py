@@ -6,6 +6,7 @@ from typing import List, Optional
 from .models import DXStation, DXDataSummary
 from .data_fetchers import fetch_all_data
 from .exceptions import DataStalenessException
+from .bands import frequency_to_band
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,14 @@ class DXPeditionService:
         
         return list(seen.values())
 
+    def normalize_bands(self, stations: List[DXStation]) -> List[DXStation]:
+        for station in stations:
+            if not station.band and station.frequency:
+                computed = frequency_to_band(float(station.frequency))
+                if computed:
+                    station.band = computed
+        return stations
+
     def _normalize_datetime(self, dt: datetime) -> datetime:
         return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
@@ -62,6 +71,7 @@ class DXPeditionService:
 
             stations = self.filter_by_age(stations)
             stations = self.deduplicate_stations(stations)
+            stations = self.normalize_bands(stations)
             stations = self.get_active_bands(stations)
             
             sources = list(set(s.source for s in stations))
