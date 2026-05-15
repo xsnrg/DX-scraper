@@ -40,4 +40,10 @@ jobs:
         pytest --ignore=tests/test_acceptance.py
     - name: Test with pytest (acceptance tests)
       run: |
+        # Start FastAPI server in background
+        uvicorn src.api:app --host 0.0.0.0 --port 8000 &
+        sleep 3
+        # Run acceptance tests
         pytest tests/test_acceptance.py
+        # Kill the server
+        kill %1 2>/dev/null || true
