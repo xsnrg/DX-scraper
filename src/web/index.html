@@ -156,7 +156,9 @@
                                 </template>
                             </td>
                             <td class="px-6 py-4">{{ station.spotter_country || station.spotter }}</td>
-                            <td class="px-6 py-4">{{ station.band }}</td>
+                            <td class="px-6 py-4">
+                                <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
+                            </td>
                             <td class="px-6 py-4 text-sm font-mono">
                                 {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : 'N/A' }}
                             </td>
