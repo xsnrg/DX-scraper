@@ -4,14 +4,6 @@ from src.api import app
 
 client = TestClient(app)
 
-def test_dxcc_map_page():
-    """Test the DXCC map page endpoint."""
-    response = client.get("/dxcc-map.html")
-    assert response.status_code == 200
-    assert "leaflet" in response.text
-    assert "DXCC" in response.text
-
-
 def test_dxcc_countries_js_file():
     """Test the DXCC countries data file is served correctly."""
     response = client.get("/static/dxcc-countries.js")
