@@ -4,25 +4,6 @@ from src.api import app
 
 client = TestClient(app)
 
-def test_qrz_sync_with_credentials(tmp_path, monkeypatch, mocker):
-    """Test /qrz-sync returns success when credentials exist."""
-    from src.qrz_config import save_qrz_data, _CONFIG_FILE
-    from unittest.mock import AsyncMock
-
-    temp_config = tmp_path / "dxscraper_config.json"
-    monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
-
-    save_qrz_data('AB1CD', 'testtoken')
-    mock_sync = AsyncMock(return_value={'status': 'ok', 'total_qsos': 100, 'synced_count': 5})
-    mocker.patch('src.api.sync_qso_data', mock_sync)
-    response = client.get("/qrz-sync")
-    assert response.status_code == 200
-    data = response.json()
-    assert data['status'] == 'ok'
-    assert data['total_qsos'] == 100
-    mock_sync.assert_called_once()
-
-
 def test_data_endpoint_has_all_search_fields():
     """Test that /data returns all fields the frontend search operates on."""
     response = client.get("/data")

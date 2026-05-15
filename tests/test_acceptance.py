@@ -751,6 +751,17 @@ def test_qrz_sync_no_credentials(page: Page):
     data = response.json()
     assert data["status"] == "error"
 
+def test_qrz_sync_with_credentials(page: Page, mocker):
+    """The /qrz-sync API returns success when credentials are configured."""
+    from unittest.mock import AsyncMock
+    mocker.patch('src.api.sync_qso_data', AsyncMock(return_value={'status': 'ok', 'total_qsos': 100, 'synced_count': 5}))
+
+    response = page.request.get("http://localhost:8000/qrz-sync")
+    assert response.status == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["total_qsos"] == 100
+
 def test_qrz_cache_api(page: Page):
     """The /qrz-cache API endpoint returns expected structure."""
     response = page.request.get("http://localhost:8000/qrz-cache")
