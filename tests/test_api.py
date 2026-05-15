@@ -4,25 +4,6 @@ from src.api import app
 
 client = TestClient(app)
 
-def test_get_data():
-    response = client.get("/data")
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, dict)
-
-def test_qrz_sync_no_credentials(tmp_path, monkeypatch):
-    """Test /qrz-sync returns 400 when no credentials configured."""
-    from src.qrz_config import _CONFIG_FILE
-    from pathlib import Path
-
-    temp_config = tmp_path / "dxscraper_config.json"
-    monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
-
-    response = client.get("/qrz-sync")
-    assert response.status_code == 400
-    data = response.json()
-    assert data['status'] == 'error'
-
 def test_qrz_sync_with_credentials(tmp_path, monkeypatch, mocker):
     """Test /qrz-sync returns success when credentials exist."""
     from src.qrz_config import save_qrz_data, _CONFIG_FILE

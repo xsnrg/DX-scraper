@@ -744,6 +744,13 @@ def test_qrz_status_api(page: Page):
     assert "callsign" in data
 
 
+def test_qrz_sync_no_credentials(page: Page):
+    """The /qrz-sync API returns 400 when no credentials are configured."""
+    response = page.request.get("http://localhost:8000/qrz-sync")
+    assert response.status == 400
+    data = response.json()
+    assert data["status"] == "error"
+
 def test_qrz_cache_api(page: Page):
     """The /qrz-cache API endpoint returns expected structure."""
     response = page.request.get("http://localhost:8000/qrz-cache")
