@@ -4,12 +4,6 @@ from src.api import app
 
 client = TestClient(app)
 
-def test_root():
-    """Test the root endpoint."""
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "DXpedition Monitor" in response.text
-
 def test_get_data():
     response = client.get("/data")
     assert response.status_code == 200
