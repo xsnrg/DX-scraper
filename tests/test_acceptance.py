@@ -783,6 +783,7 @@ def test_qrz_sync_no_credentials(page: Page):
         data = response.json()
         assert data["status"] == "ok"
 
+@pytest.mark.skip(reason="requires real QRZ credentials, not available in CI")
 def test_qrz_sync_with_credentials(page: Page, mocker):
     """The /qrz-sync API returns success when credentials are configured."""
     response = page.request.get("http://localhost:8000/qrz-sync")
