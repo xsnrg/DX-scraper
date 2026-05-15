@@ -43,7 +43,8 @@ class TestQRZTokenValidation:
         mock_session = self._make_mock_session('RESULT=OK&BOOKID=12345&CALLSIGN=AB1CD')
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
-            response = client.post("/qrz-token", json={"callsign": "AB1CD", "token": "validtoken"})
+            with patch('keyring.set_password'):
+                response = client.post("/qrz-token", json={"callsign": "AB1CD", "token": "validtoken"})
 
         assert response.status_code == 200
         data = response.json()
@@ -94,7 +95,8 @@ class TestQRZTokenValidation:
         mock_session = self._make_mock_session(auth_response)
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
-            response = client.post("/qrz-token", json={"callsign": "AB1CD", "token": "oldtoken"})
+            with patch('keyring.set_password'):
+                response = client.post("/qrz-token", json={"callsign": "AB1CD", "token": "oldtoken"})
 
         assert response.status_code == 200
         data = response.json()
@@ -226,7 +228,8 @@ class TestQRZSyncReturnsNeedsRenewal:
         temp_config = tmp_path / "dxscraper_config.json"
         monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
 
-        save_qrz_data('AB1CD', 'expiredtoken')
+        with patch('keyring.set_password'):
+            save_qrz_data('AB1CD', 'expiredtoken')
 
         mock_sync = AsyncMock(return_value={'status': 'error', 'error': 'Auth failed: RESULT=FAIL (REASON=Expired key)', 'needs_renewal': True})
         mocker.patch('src.api.sync_qso_data', mock_sync)
@@ -254,7 +257,8 @@ class TestDebugQRZRenewal:
 
         # Pre-save credentials so _debug_qrz finds them
         save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
-        save_qrz_data('AB1CD', 'expiredtoken')
+        with patch('keyring.set_password'):
+            save_qrz_data('AB1CD', 'expiredtoken')
 
         mock_keyring = MagicMock()
         mock_keyring.get_password = MagicMock(return_value='expiredtoken')
@@ -298,8 +302,9 @@ class TestDebugQRZRenewal:
         temp_config = tmp_path / "dxscraper_config.json"
         monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
 
-        save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
-        save_qrz_data('AB1CD', 'expiredtoken')
+        with patch('keyring.set_password'):
+            save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
+            save_qrz_data('AB1CD', 'expiredtoken')
 
         mock_sync = AsyncMock(return_value={'status': 'error', 'error': 'Auth failed', 'needs_renewal': True})
 
@@ -324,8 +329,9 @@ class TestDebugQRZRenewal:
         temp_config = tmp_path / "dxscraper_config.json"
         monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
 
-        save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
-        save_qrz_data('AB1CD', 'expiredtoken')
+        with patch('keyring.set_password'):
+            save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
+            save_qrz_data('AB1CD', 'expiredtoken')
 
         call_count = [0]
         async def mock_sync(*args, **kwargs):
@@ -359,8 +365,9 @@ class TestDebugQRZRenewal:
         temp_config = tmp_path / "dxscraper_config.json"
         monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
 
-        save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
-        save_qrz_data('AB1CD', 'expiredtoken')
+        with patch('keyring.set_password'):
+            save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
+            save_qrz_data('AB1CD', 'expiredtoken')
 
         mock_sync = AsyncMock(return_value={'status': 'error', 'error': 'Auth failed', 'needs_renewal': True})
 
@@ -387,8 +394,9 @@ class TestDebugQRZRenewal:
         temp_config = tmp_path / "dxscraper_config.json"
         monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
 
-        save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
-        save_qrz_data('AB1CD', 'validtoken')
+        with patch('keyring.set_password'):
+            save_qrz_data = __import__('src.qrz_config', fromlist=['save_qrz_data']).save_qrz_data
+            save_qrz_data('AB1CD', 'validtoken')
 
         mock_sync = AsyncMock(return_value={'status': 'ok', 'total_qsos': 100, 'synced_count': 100})
 
