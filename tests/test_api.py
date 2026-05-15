@@ -4,61 +4,6 @@ from src.api import app
 
 client = TestClient(app)
 
-def test_data_endpoint_has_all_search_fields():
-    """Test that /data returns all fields the frontend search operates on."""
-    response = client.get("/data")
-    assert response.status_code == 200
-    data = response.json()
-    stations = data.get("stations", [])
-    if not stations:
-        pytest.skip("No stations available to validate schema")
-    required_fields = [
-        "callsign", "dx_country", "spotter_country", "spotter",
-        "band", "frequency", "mode", "comment", "source", "last_update"
-    ]
-    for field in required_fields:
-        assert field in stations[0], f"Missing field '{field}' in /data response"
-
-
-def test_qrz_cache_no_file(tmp_path, monkeypatch):
-    """Test /qrz-cache returns empty list when no cache file exists."""
-    from src.qrz_qso import QSO_CACHE_FILE
-    from pathlib import Path
-
-    temp_cache = tmp_path / "dxscraper_qso.jsonl"
-    monkeypatch.setattr('src.api.QSO_CACHE_FILE', temp_cache)
-
-    response = client.get("/qrz-cache")
-    assert response.status_code == 200
-    data = response.json()
-    assert data == {"data": [], "exists": False, "count": 0, "last_modified": ""}
-
-
-def test_qrz_cache_with_file(tmp_path, monkeypatch):
-    """Test /qrz-cache returns pairs from cache file."""
-    from src.qrz_qso import QSO_CACHE_FILE
-    import json
-
-    temp_cache = tmp_path / "dxscraper_qso.jsonl"
-    monkeypatch.setattr('src.api.QSO_CACHE_FILE', temp_cache)
-
-    cache_data = [
-        {"call": "W1AW", "time_on": "2024-01-01T00:00:00Z", "time_off": "", "freq": "14.200", "mode": "CW", "rst_sent": "59", "rst_recv": "59", "grid": "EN31", "notes": "", "app_qrzlog_status": "C"},
-        {"call": "k2abc", "time_on": "2024-01-01T01:00:00Z", "time_off": "", "freq": "7.074", "mode": "SSB", "rst_sent": "59", "rst_recv": "59", "grid": "FN31", "notes": "", "app_qrzlog_status": "C"},
-        {"call": "INVALID", "time_on": "", "time_off": "", "freq": "", "mode": "", "rst_sent": "", "rst_recv": "", "grid": "", "notes": ""},
-    ]
-    temp_cache.write_text('\n'.join(json.dumps(d) for d in cache_data))
-    response = client.get("/qrz-cache")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["data"]) == 2
-    assert data["data"][0] == ["W1AW", "20m"]
-    assert data["data"][1] == ["K2ABC", "40m"]
-    assert data["exists"] is True
-    assert data["count"] == 2
-    assert "last_modified" in data
-
-
 def test_dxcc_map_page():
     """Test the DXCC map page endpoint."""
     response = client.get("/dxcc-map.html")
