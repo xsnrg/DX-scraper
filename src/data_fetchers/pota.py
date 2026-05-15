@@ -38,9 +38,11 @@ class PotaFetcher(BaseFetcher):
                     try:
                         f = float(freq)
                         if f == f and f != float('inf') and f != float('-inf'):
-                            frequency = f
+                            frequency = f / 1000.0
                         else:
                             frequency = None
+                    except (ValueError, TypeError):
+                        frequency = None
                     except (ValueError, TypeError):
                         frequency = None
                 else:

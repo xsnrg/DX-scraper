@@ -61,7 +61,7 @@ class HamQTHFetcher(BaseFetcher):
                     spotter_country="",
                     spotter=spotter,
                     band=band,
-                    frequency=float(frequency_str) if frequency_str else None,
+                    frequency=float(frequency_str) / 1000.0 if frequency_str else None,
                     mode="",
                     comment=comment,
                     last_update=last_update,

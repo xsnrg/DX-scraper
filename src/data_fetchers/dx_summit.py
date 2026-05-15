@@ -55,7 +55,7 @@ class DXSummitFetcher(BaseFetcher):
                 if dx_call in stations_map:
                     continue
                 
-                frequency = float(spot.get("frequency", 0))
+                frequency = float(spot.get("frequency", 0)) / 1000.0
                 
                 try:
                     last_update = datetime.fromisoformat(spot.get("time", "").replace("Z", "+00:00"))

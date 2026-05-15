@@ -303,7 +303,7 @@ class TestPotaFetcher:
         assert len(stations) == 1
         assert stations[0].callsign == "W2QMI"
         assert stations[0].dx_country == "US-NJ, US-6544"
-        assert stations[0].frequency == 14286.0
+        assert stations[0].frequency == 14.286
         assert stations[0].mode == "SSB"
         assert stations[0].comment == "QRT THX 73 gone hunting!"
         assert stations[0].source == "POTA"
