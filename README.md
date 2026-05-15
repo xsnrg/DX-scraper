@@ -28,7 +28,7 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | FastAPI / Python 3.12+ |
+| Backend | FastAPI / Python 3.14+ |
 | Data Fetchers | `aiohttp` + `BeautifulSoup4` (async) |
 | Frontend | Static HTML/JS dashboard served by the API |
 | Config | `.env` via `python-dotenv` |
@@ -100,9 +100,12 @@ Dashboard is available at [http://localhost:8000](http://localhost:8000).
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
-pytest                          # all tests
-pytest tests/test_service.py -v  # single file
+pytest --ignore=tests/test_acceptance.py  # unit tests (179 tests)
+pytest tests/test_acceptance.py -v        # acceptance tests (75 tests)
+pytest tests/test_service.py -v           # single file
 ```
+
+**Important:** Acceptance tests must be run separately from unit tests. Playwright leaves a running event loop that breaks subsequent async tests.
 
 `pytest.ini` sets `asyncio_mode = auto` and `pythonpath = .`.
 
