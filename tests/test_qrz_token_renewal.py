@@ -223,14 +223,12 @@ class TestQRZSyncReturnsNeedsRenewal:
     """Tests that /qrz-sync returns needs_renewal when token is bad."""
 
     def test_qrz_sync_with_expired_token_returns_502_with_needs_renewal(self, tmp_path, monkeypatch, mocker):
-        from src.qrz_config import save_qrz_data, _CONFIG_FILE
-
-        temp_config = tmp_path / "dxscraper_config.json"
-        monkeypatch.setattr('src.qrz_config._CONFIG_FILE', temp_config)
+        from src.qrz_config import save_qrz_data
 
         with patch('keyring.set_password'):
             save_qrz_data('AB1CD', 'expiredtoken')
 
+        mock_get = mocker.patch('src.api.get_qrz_data', return_value={'callsign': 'AB1CD', 'token': 'expiredtoken'})
         mock_sync = AsyncMock(return_value={'status': 'error', 'error': 'Auth failed: RESULT=FAIL (REASON=Expired key)', 'needs_renewal': True})
         mocker.patch('src.api.sync_qso_data', mock_sync)
 
