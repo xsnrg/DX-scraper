@@ -55,7 +55,7 @@
                 </div>
                 <div class="flex flex-col items-center">
                     <button @click="toggleWanted"
-                            :class="wantedMode === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'"
+                            :class="wantedMode === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'"
                             class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="!qrzReady">
                         <i class="fas" :class="wantedMode === 0 ? 'fa-star-half-stroke' : wantedMode === 1 ? 'fa-star' : 'fa-crosshairs'"></i>
