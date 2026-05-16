@@ -54,6 +54,16 @@
                     <div class="text-xs text-transparent mt-1">QRZ filter</div>
                 </div>
                 <div class="flex flex-col items-center">
+                    <button @click="toggleWanted"
+                            :class="wantedEnabled ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="!qrzCacheInfo.exists || qrzCacheInfo.count === 0">
+                        <i class="fas" :class="wantedEnabled ? 'fa-star' : 'fa-star-half-stroke'"></i>
+                        {{ wantedEnabled ? 'Wanted highlighted' : 'Wanted disabled' }}
+                    </button>
+                    <div class="text-xs text-transparent mt-1">Wanted</div>
+                </div>
+                <div class="flex flex-col items-center">
                     <button @click="fetchData" :disabled="loading" 
                             class="bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
                         <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
@@ -155,6 +165,7 @@
                                     <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.dx_country : station.dx_country" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.dx_country }}</span>
                                 </template>
                             </td>
+                            <td class="px-6 py-4 text-xs font-mono text-slate-500">{{ station.dxcc || '-' }}</td>
                             <td class="px-6 py-4">{{ station.spotter_country || station.spotter }}</td>
                             <td class="px-6 py-4">
                                 <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
@@ -175,7 +186,7 @@
                             </td>
                         </tr>
                         <tr v-if="filteredStations.length === 0">
-                            <td colspan="8" class="px-6 py-12 text-center text-slate-500 italic">
+                            <td colspan="9" class="px-6 py-12 text-center text-slate-500 italic">
                                 No stations found matching your criteria.
                             </td>
                         </tr>
@@ -278,6 +289,8 @@
                 const qrzCacheMap = ref(new Map());
                 const qrzCacheInfo = ref({ exists: false, count: 0, last_modified: '' });
                 const qrzAllBands = ref(new Map());
+                const qrzConfirmedDxccNumbers = ref(new Set());
+                const wantedEnabled = ref(localStorage.getItem('wantedEnabled') === 'true');
 
                 const loadQrzCache = async () => {
                     try {
@@ -287,7 +300,7 @@
                             qrzCacheData.value = data.data || [];
                             qrzCacheInfo.value = { exists: data.exists || false, count: data.count || 0, last_modified: data.last_modified || '' };
                             const map = new Map();
-                            for (const [call, band] of (data.data || [])) {
+                            for (const [call, band, dxcc] of (data.data || [])) {
                                 const key = call.toUpperCase();
                                 if (!map.has(key)) map.set(key, new Set());
                                 map.get(key).add(band.toUpperCase());
@@ -297,7 +310,24 @@
                     } catch {
                         qrzCacheData.value = [];
                         qrzCacheMap.value = new Map();
+                        qrzConfirmedDxccNumbers.value = new Set();
                         qrzCacheInfo.value = { exists: false, count: 0, last_modified: '' };
+                    }
+                    try {
+                        const resp = await fetch('/qrz-dxcc-numbers');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const dxccSet = new Set();
+                            for (const dxcc of (data.data || [])) {
+                                const normalized = dxcc.toString().trim().replace(/^0+/, '');
+                                if (normalized) {
+                                    dxccSet.add(normalized);
+                                }
+                            }
+                            qrzConfirmedDxccNumbers.value = dxccSet;
+                        }
+                    } catch {
+                        qrzConfirmedDxccNumbers.value = new Set();
                     }
                     try {
                         const resp = await fetch('/qrz-all-data');
@@ -327,8 +357,13 @@
                     fetchData();
                 };
 
+                const toggleWanted = () => {
+                    wantedEnabled.value = !wantedEnabled.value;
+                    localStorage.setItem('wantedEnabled', wantedEnabled.value.toString());
+                };
+
                 const getQrzRowClass = (station) => {
-                    if (!qrzFilterEnabled.value) return '';
+                    if (!qrzFilterEnabled.value && !wantedEnabled.value) return '';
                     
                     if (station.source === 'POTA' && potaEnabled.value) return '';
                     
@@ -336,9 +371,16 @@
                     const stationBands = getStationBands(station);
                     
                     const confirmedBands = qrzCacheMap.value.get(call);
-                    if (confirmedBands) {
+                    if (qrzFilterEnabled.value && confirmedBands) {
                         for (const b of stationBands) {
                             if (confirmedBands.has(b)) return '';
+                        }
+                    }
+                    
+                    if (wantedEnabled.value && station.dxcc) {
+                        const normalized = station.dxcc.toString().trim().replace(/^0+/, '');
+                        if (normalized && !qrzConfirmedDxccNumbers.value.has(normalized)) {
+                            return 'bg-red-500/30';
                         }
                     }
                     
@@ -371,6 +413,7 @@
                 const columns = [
                     { key: 'callsign', label: 'DX Callsign' },
                     { key: 'dx_country', label: 'DX Location' },
+                    { key: 'dxcc', label: 'DXCC' },
                     { key: 'spotter_country', label: 'Spotter' },
                     { key: 'band', label: 'Band' },
                     { key: 'frequency', label: 'Frequency' },
@@ -617,6 +660,7 @@
                     syncStatus, syncQrzData, needsRenewal,
                     qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
                     getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
+                    wantedEnabled, toggleWanted,
                 };
             }
         }).mount('#app');

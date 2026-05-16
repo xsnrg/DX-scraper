@@ -7,6 +7,7 @@ from .models import DXStation, DXDataSummary
 from .data_fetchers import fetch_all_data
 from .exceptions import DataStalenessException
 from .bands import frequency_to_band
+from .dxcc import resolve_dxcc
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,16 @@ class DXPeditionService:
                     station.band = computed
         return stations
 
+    def resolve_dxcc_numbers(self, stations: List[DXStation]) -> List[DXStation]:
+        for station in stations:
+            if station.source == "POTA":
+                continue
+            if station.dxcc:
+                station.dxcc = station.dxcc.strip().lstrip("0") or ""
+            else:
+                station.dxcc = resolve_dxcc(station.dx_country) or ""
+        return stations
+
     def _normalize_datetime(self, dt: datetime) -> datetime:
         return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
@@ -72,6 +83,7 @@ class DXPeditionService:
             stations = self.filter_by_age(stations)
             stations = self.deduplicate_stations(stations)
             stations = self.normalize_bands(stations)
+            stations = self.resolve_dxcc_numbers(stations)
             stations = self.get_active_bands(stations)
             
             sources = list(set(s.source for s in stations))

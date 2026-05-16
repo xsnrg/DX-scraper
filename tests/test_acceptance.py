@@ -707,6 +707,244 @@ def test_qrz_filter_uses_station_band_not_bands(page: Page):
     assert 's.band' in html, "Filtering logic should use s.band (singular)"
     assert 's.bands' not in html, "Filtering logic should not use s.bands (plural)"
 
+
+def test_wanted_button_visible_on_dashboard(page: Page):
+    """Wanted toggle button is visible on the dashboard."""
+    page.goto("http://localhost:8000")
+    buttons = page.get_by_role("button").all()
+    button_texts = [b.inner_text() for b in buttons]
+    found = [t for t in button_texts if "Wanted" in t]
+    assert len(found) > 0, f"Wanted button not found. Buttons: {button_texts}"
+
+
+def test_wanted_button_highlights_stations_not_in_qrz_cache(page: Page):
+    """Enabling Wanted filter highlights rows with DXCC numbers not in QRZ cache with red class."""
+    mock = _mock_data(num_stations=5)
+    # Set DXCC numbers using only non-POTA stations from mock: W1AW, VK3EPR, ZS6DX, JA1RAT
+    for s in mock["stations"]:
+        if s["callsign"] == "W1AW":
+            s["dx_country"] = "United States"
+            s["dxcc"] = "291"
+            s["source"] = "DX Summit"
+        elif s["callsign"] == "VK3EPR":
+            s["dx_country"] = "Australia"
+            s["dxcc"] = "50"
+            s["source"] = "DX Cluster"
+        elif s["callsign"] == "ZS6DX":
+            s["dx_country"] = "South Africa"
+            s["dxcc"] = "197"
+            s["source"] = "DX Summit"
+        elif s["callsign"] == "JA1RAT":
+            s["dx_country"] = "Japan"
+            s["dxcc"] = "339"
+            s["source"] = "DX Cluster"
+    
+    page.route("**/data*", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(mock),
+    ))
+    page.route("**/qrz-cache", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "291"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-dxcc-numbers", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 2, "data": ["291", "50"], "last_modified": ""}),
+    ))
+    page.route("**/qrz-all-data", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "C"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-status", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
+    ))
+    page.goto("http://localhost:8000")
+    
+    # Wait for data to load
+    expect(page.get_by_text("Total Stations")).to_be_visible()
+    
+    # Enable Wanted filter
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    
+    # Wait for the Wanted button to show it's enabled
+    expect(page.get_by_role("button", name=re.compile("Wanted highlighted"))).to_be_visible()
+    
+    # W1AW has DXCC 291 which IS in QRZ cache -> should NOT be highlighted
+    w1aw_row = page.locator("tr").filter(has_text="W1AW").first
+    classes = w1aw_row.get_attribute("class") or ""
+    assert "bg-red-500/30" not in classes, f"W1AW (DXCC 291 in cache) should not be highlighted red, got: {classes}"
+    
+    # VK3EPR has DXCC 50 which IS in QRZ cache -> should NOT be highlighted
+    vk_row = page.locator("tr").filter(has_text="VK3EPR").first
+    vk_classes = vk_row.get_attribute("class") or ""
+    assert "bg-red-500/30" not in vk_classes, f"VK3EPR (DXCC 50 in cache) should not be highlighted red, got: {vk_classes}"
+    
+    # ZS6DX has DXCC 197 which is NOT in QRZ cache -> should be highlighted with red
+    zs_row = page.locator("tr").filter(has_text="ZS6DX").first
+    zs_classes = zs_row.get_attribute("class") or ""
+    assert "bg-red-500/30" in zs_classes, f"ZS6DX (DXCC 197 not in cache) should be highlighted red, got: {zs_classes}"
+    
+    # JA1RAT has DXCC 339 which is NOT in QRZ cache -> should be highlighted with red
+    ja_row = page.locator("tr").filter(has_text="JA1RAT").first
+    ja_classes = ja_row.get_attribute("class") or ""
+    assert "bg-red-500/30" in ja_classes, f"JA1RAT (DXCC 339 not in cache) should be highlighted red, got: {ja_classes}"
+
+
+def test_wanted_button_ignores_pota_stations(page: Page):
+    """Wanted filter does not highlight POTA stations even when DXCC is not in cache."""
+    mock = _mock_data(num_stations=3)
+    for s in mock["stations"]:
+        if s["source"] == "POTA":
+            s["dx_country"] = "Palau"
+            s["dxcc"] = "22"
+        else:
+            s["dxcc"] = ""
+    
+    page.route("**/data*", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(mock),
+    ))
+    page.route("**/qrz-cache", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "291"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-dxcc-numbers", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": ["291"], "last_modified": ""}),
+    ))
+    page.route("**/qrz-all-data", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "C"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-status", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
+    ))
+    page.goto("http://localhost:8000")
+    
+    expect(page.get_by_text("Total Stations")).to_be_visible()
+    
+    # Enable Wanted filter
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    
+    # POTA station should NOT be highlighted
+    pota_row = page.locator("tr").filter(has_text="P29V").first
+    classes = pota_row.get_attribute("class") or ""
+    assert "bg-red-500/30" not in classes, f"POTA station should not be highlighted, got: {classes}"
+
+
+def test_wanted_button_normalizes_leading_zeros(page: Page):
+    """Wanted filter correctly normalizes DXCC numbers with leading zeros."""
+    mock = _mock_data(num_stations=3)
+    for s in mock["stations"]:
+        if s["callsign"] == "W1AW":
+            s["dxcc"] = "0291"  # leading zero
+        elif s["callsign"] == "VK3EPR":
+            s["dxcc"] = "0050"  # leading zeros
+        else:
+            s["dxcc"] = ""
+    
+    page.route("**/data*", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(mock),
+    ))
+    page.route("**/qrz-cache", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "291"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-dxcc-numbers", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": ["291"], "last_modified": ""}),
+    ))
+    page.route("**/qrz-all-data", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "C"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-status", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
+    ))
+    page.goto("http://localhost:8000")
+    
+    expect(page.get_by_text("Total Stations")).to_be_visible()
+    
+    # Enable Wanted filter
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    
+    # W1AW has DXCC 0291 which normalizes to 291 -> IS in cache -> should NOT be highlighted
+    w1aw_row = page.locator("tr").filter(has_text="W1AW").first
+    classes = w1aw_row.get_attribute("class") or ""
+    assert "bg-red-500/30" not in classes, f"W1AW (DXCC 0291 normalized to 291 in cache) should not be highlighted, got: {classes}"
+    
+    # VK3EPR has DXCC 0050 which normalizes to 50 -> NOT in cache -> should be highlighted
+    vk_row = page.locator("tr").filter(has_text="VK3EPR").first
+    vk_classes = vk_row.get_attribute("class") or ""
+    assert "bg-red-500/30" in vk_classes, f"VK3EPR (DXCC 0050 normalized to 50 not in cache) should be highlighted, got: {vk_classes}"
+
+
+def test_wanted_row_color_is_red(page: Page):
+    """Wanted rows use bg-red-500/30 class (not orange or other colors)."""
+    mock = _mock_data(num_stations=3)
+    for s in mock["stations"]:
+        if s["callsign"] == "VK3EPR":
+            s["dxcc"] = "50"
+        else:
+            s["dxcc"] = ""
+    
+    page.route("**/data*", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(mock),
+    ))
+    page.route("**/qrz-cache", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "291"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-dxcc-numbers", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": ["291"], "last_modified": ""}),
+    ))
+    page.route("**/qrz-all-data", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "C"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-status", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
+    ))
+    page.goto("http://localhost:8000")
+    
+    expect(page.get_by_text("Total Stations")).to_be_visible()
+    
+    # Enable Wanted filter
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    
+    # VK3EPR should be highlighted with red, not orange
+    vk_row = page.locator("tr").filter(has_text="VK3EPR").first
+    vk_classes = vk_row.get_attribute("class") or ""
+    assert "bg-red-500/30" in vk_classes, f"VK3EPR should have bg-red-500/30, got: {vk_classes}"
+    assert "bg-orange" not in vk_classes, f"VK3EPR should NOT have orange class, got: {vk_classes}"
+
 def test_map_back_to_dashboard(page: Page):
     """Map page has a link back to the dashboard."""
     page.goto("http://localhost:8000/dxcc-map.html")

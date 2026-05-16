@@ -39,6 +39,7 @@ class HamQTHFetcher(BaseFetcher):
                 date_time_str = parts[4].strip()
                 band = parts[8].strip()
                 country = parts[9].strip()
+                adif = parts[10].strip() if len(parts) > 10 else ""
 
                 if not callsign:
                     continue
@@ -58,6 +59,7 @@ class HamQTHFetcher(BaseFetcher):
                 stations.append(DXStation(
                     callsign=callsign,
                     dx_country=country,
+                    dxcc=adif if adif else "",
                     spotter_country="",
                     spotter=spotter,
                     band=band,

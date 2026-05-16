@@ -102,12 +102,38 @@ async def qrz_cache():
                 except (ValueError, TypeError):
                     pass
             call = d.get("call", "")
+            dxcc = d.get("dxcc", "")
             if band and call and d.get("app_qrzlog_status") == "C":
-                pairs.append([call.upper(), band])
+                pairs.append([call.upper(), band, dxcc])
         except (json.JSONDecodeError, TypeError):
             pass
     last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
     return {"data": pairs, "exists": True, "count": len(pairs), "last_modified": last_modified}
+
+
+@app.get("/qrz-dxcc-numbers")
+async def qrz_dxcc_numbers():
+    """Return unique DXCC numbers from confirmed QSOs for the Wanted filter."""
+    import json
+    import time
+    if not QSO_CACHE_FILE.exists():
+        return {"data": [], "exists": False, "count": 0, "last_modified": ""}
+    stat = QSO_CACHE_FILE.stat()
+    dxcc_set = set()
+    for line in QSO_CACHE_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+            if d.get("app_qrzlog_status") == "C" and d.get("dxcc"):
+                dxcc = d["dxcc"].strip().lstrip("0")
+                if dxcc:
+                    dxcc_set.add(dxcc)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+    return {"data": sorted(dxcc_set, key=lambda x: int(x)), "exists": True, "count": len(dxcc_set), "last_modified": last_modified}
 
 
 @app.get("/qrz-all-data")

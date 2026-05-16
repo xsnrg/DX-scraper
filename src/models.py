@@ -8,6 +8,7 @@ class DXStation(BaseModel):
 
     callsign: str
     dx_country: str = ""
+    dxcc: str = ""
     spotter_country: str = ""
     spotter: str = ""
     band: str = ""
