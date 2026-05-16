@@ -16,6 +16,7 @@ A real-time monitoring tool for tracking active DXpeditions across various amate
 - **Secure Credential Storage** — QRZ API token stored in OS keyring (Keychain/SecretService/Credential Locker), not on disk
 - **POTA Integration** — Track Parks On The Air activations with park reference links to pota.app
 - **POTA Toggle** — Enable/disable POTA data from the dashboard with one click
+- **Wanted Filter** — 3-way toggle (disabled / highlighted / only wanted) to find stations you haven't contacted yet. Highlights rows in red and can filter to show only wanted stations. Button color and icons change with mode.
 - **Spot Age Filter** — Filter spots by age (10/20/30/60 min) directly from the dashboard
 - **Clickable Filters** — Click Band, Mode, or DX Location values in the table to add them to the search query as AND terms. Clear the search with the X button in the search box.
 - **Multi-Source Display** — See all data sources per station (e.g., "DX Summit, POTA") for data provenance
@@ -113,11 +114,11 @@ pytest tests/test_service.py -v           # single file
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
-pytest tests/test_acceptance.py -v  # all acceptance tests (59 tests)
+pytest tests/test_acceptance.py -v  # all acceptance tests (78 tests)
 pytest tests/test_acceptance.py -v -k "spot_age"  # single test
 ```
 
-Acceptance tests use **pytest-playwright** (headless Chromium) to verify user-facing dashboard features. Tests cover: dashboard load, stats cards, loading/error states, search, clickable column filters, pagination, spot age filter, POTA toggle, QRZ APIs, DXCC map page, responsive layout.
+Acceptance tests use **pytest-playwright** (headless Chromium) to verify user-facing dashboard features. Tests cover: dashboard load, stats cards, loading/error states, search, clickable column filters, pagination, spot age filter, POTA toggle, QRZ APIs, DXCC map page, responsive layout, Wanted filter (3-way toggle with red highlight and "only wanted" mode).
 
 ## API Endpoints
 
