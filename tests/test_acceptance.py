@@ -772,8 +772,8 @@ def test_wanted_button_highlights_stations_not_in_qrz_cache(page: Page):
     # Enable Wanted filter
     page.get_by_role("button", name=re.compile("Wanted")).first.click()
     
-    # Wait for the Wanted button to show it's enabled
-    expect(page.get_by_role("button", name=re.compile("Wanted highlighted"))).to_be_visible()
+    # Wait for the Wanted button to show it's enabled (mode 1)
+    expect(page.get_by_role("button", name=re.compile("Wanted enabled"))).to_be_visible()
     
     # W1AW has DXCC 291 which IS in QRZ cache -> should NOT be highlighted
     w1aw_row = page.locator("tr").filter(has_text="W1AW").first
@@ -952,6 +952,173 @@ def test_map_back_to_dashboard(page: Page):
 
 
 # ===========================
+    # Click again to cycle to "Only wanted"
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    expect(page.get_by_role("button", name=re.compile("Only wanted"))).to_be_visible()
+    
+    # Click again to cycle back to disabled
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    expect(page.get_by_role("button", name=re.compile("Wanted disabled"))).to_be_visible()
+
+
+def test_only_wanted_shows_only_wanted_rows(page: Page):
+    """Only wanted mode shows only stations with DXCC numbers not in QRZ cache."""
+    mock = _mock_data(num_stations=5)
+    for s in mock["stations"]:
+        if s["callsign"] == "W1AW":
+            s["dx_country"] = "United States"
+            s["dxcc"] = "291"
+            s["source"] = "DX Summit"
+        elif s["callsign"] == "VK3EPR":
+            s["dx_country"] = "Australia"
+            s["dxcc"] = "50"
+            s["source"] = "DX Cluster"
+        elif s["callsign"] == "ZS6DX":
+            s["dx_country"] = "South Africa"
+            s["dxcc"] = "197"
+            s["source"] = "DX Summit"
+        elif s["callsign"] == "JA1RAT":
+            s["dx_country"] = "Japan"
+            s["dxcc"] = "339"
+            s["source"] = "DX Cluster"
+    
+    page.route("**/data*", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(mock),
+    ))
+    page.route("**/qrz-cache", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "291"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-dxcc-numbers", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 2, "data": ["291", "50"], "last_modified": ""}),
+    ))
+    page.route("**/qrz-all-data", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 1, "data": [["W1AW", "40M", "C"]], "last_modified": ""}),
+    ))
+    page.route("**/qrz-status", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
+    ))
+    page.goto("http://localhost:8000")
+    
+    expect(page.get_by_text("Total Stations")).to_be_visible()
+    
+    # Click twice to reach "Only wanted" mode
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    expect(page.get_by_role("button", name=re.compile("Only wanted"))).to_be_visible()
+    
+    # Only ZS6DX and JA1RAT should be visible (DXCC 197 and 339 not in QRZ cache)
+    zs_row = page.locator("tr").filter(has_text="ZS6DX").first
+    expect(zs_row).to_be_visible()
+    
+    ja_row = page.locator("tr").filter(has_text="JA1RAT").first
+    expect(ja_row).to_be_visible()
+    
+    # W1AW and VK3EPR should NOT be visible (DXCC 291 and 50 ARE in QRZ cache)
+    w1aw_row = page.locator("tr").filter(has_text="W1AW").first
+    expect(w1aw_row).not_to_be_visible()
+    
+    vk_row = page.locator("tr").filter(has_text="VK3EPR").first
+    expect(vk_row).not_to_be_visible()
+
+
+def test_wanted_button_color_changes(page: Page):
+    """Wanted button color changes from emerald to red when enabled."""
+    mock = _mock_data(num_stations=3)
+    
+    page.route("**/data*", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(mock),
+    ))
+    page.route("**/qrz-status", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
+    ))
+    page.goto("http://localhost:8000")
+    
+    expect(page.get_by_text("Total Stations")).to_be_visible()
+    
+    # Initially emerald (disabled)
+    button = page.get_by_role("button", name=re.compile("Wanted")).first
+    classes = button.get_attribute("class") or ""
+    assert "bg-emerald-600" in classes, f"Button should be emerald when disabled, got: {classes}"
+    
+    # Click to enable
+    button.click()
+    expect(page.get_by_role("button", name=re.compile("Wanted enabled"))).to_be_visible()
+    
+    # Now red (enabled)
+    button = page.get_by_role("button", name=re.compile("Wanted enabled")).first
+    classes = button.get_attribute("class") or ""
+    assert "bg-red-600" in classes, f"Button should be red when enabled, got: {classes}"
+    
+    # Click to "Only wanted"
+    button.click()
+    expect(page.get_by_role("button", name=re.compile("Only wanted"))).to_be_visible()
+    
+    # Still red (only wanted)
+    button = page.get_by_role("button", name=re.compile("Only wanted")).first
+    classes = button.get_attribute("class") or ""
+    assert "bg-red-600" in classes, f"Button should be red in only wanted mode, got: {classes}"
+    
+    # Click back to disabled
+    button.click()
+    expect(page.get_by_role("button", name=re.compile("Wanted disabled"))).to_be_visible()
+    
+    # Back to emerald
+    button = page.get_by_role("button", name=re.compile("Wanted disabled")).first
+    classes = button.get_attribute("class") or ""
+    assert "bg-emerald-600" in classes, f"Button should be emerald when disabled, got: {classes}"
+
+
+def test_wanted_icon_changes_with_mode(page: Page):
+    """Wanted button icon changes: half-stroke -> star -> bullseye -> half-stroke."""
+    mock = _mock_data(num_stations=3)
+    
+    page.route("**/data*", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(mock),
+    ))
+    page.route("**/qrz-status", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
+    ))
+    page.goto("http://localhost:8000")
+    
+    expect(page.get_by_text("Total Stations")).to_be_visible()
+    
+    # Initially half-stroke icon (disabled)
+    expect(page.locator("i.fas.fa-star-half-stroke")).to_be_visible()
+    
+    # Click to enable
+    page.get_by_role("button", name=re.compile("Wanted")).first.click()
+    expect(page.get_by_role("button", name=re.compile("Wanted enabled"))).to_be_visible()
+    expect(page.locator("i.fas.fa-star")).to_be_visible()
+    
+    # Click to "Only wanted"
+    page.get_by_role("button", name=re.compile("Wanted enabled")).first.click()
+    expect(page.get_by_role("button", name=re.compile("Only wanted"))).to_be_visible()
+    expect(page.locator("i.fas.fa-crosshairs")).to_be_visible()
+    
+    # Click back to disabled
+    page.get_by_role("button", name=re.compile("Only wanted")).first.click()
+    expect(page.get_by_role("button", name=re.compile("Wanted disabled"))).to_be_visible()
+    expect(page.locator("i.fas.fa-star-half-stroke")).to_be_visible()
+
+
 # Refresh / countdown tests
 # ===========================
 

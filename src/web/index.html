@@ -55,11 +55,11 @@
                 </div>
                 <div class="flex flex-col items-center">
                     <button @click="toggleWanted"
-                            :class="wantedEnabled ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            :class="wantedMode === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'"
                             class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="!qrzCacheInfo.exists || qrzCacheInfo.count === 0">
-                        <i class="fas" :class="wantedEnabled ? 'fa-star' : 'fa-star-half-stroke'"></i>
-                        {{ wantedEnabled ? 'Wanted highlighted' : 'Wanted disabled' }}
+                        <i class="fas" :class="wantedMode === 0 ? 'fa-star-half-stroke' : wantedMode === 1 ? 'fa-star' : 'fa-crosshairs'"></i>
+                        {{ wantedMode === 0 ? 'Wanted disabled' : wantedMode === 1 ? 'Wanted enabled' : 'Only wanted' }}
                     </button>
                     <div class="text-xs text-transparent mt-1">Wanted</div>
                 </div>
@@ -290,7 +290,7 @@
                 const qrzCacheInfo = ref({ exists: false, count: 0, last_modified: '' });
                 const qrzAllBands = ref(new Map());
                 const qrzConfirmedDxccNumbers = ref(new Set());
-                const wantedEnabled = ref(localStorage.getItem('wantedEnabled') === 'true');
+                const wantedMode = ref(parseInt(localStorage.getItem('wantedMode') || '0'));
 
                 const loadQrzCache = async () => {
                     try {
@@ -358,12 +358,12 @@
                 };
 
                 const toggleWanted = () => {
-                    wantedEnabled.value = !wantedEnabled.value;
-                    localStorage.setItem('wantedEnabled', wantedEnabled.value.toString());
+                    wantedMode.value = (wantedMode.value + 1) % 3;
+                    localStorage.setItem('wantedMode', wantedMode.value.toString());
                 };
 
                 const getQrzRowClass = (station) => {
-                    if (!qrzFilterEnabled.value && !wantedEnabled.value) return '';
+                    if (!qrzFilterEnabled.value && wantedMode.value === 0) return '';
                     
                     if (station.source === 'POTA' && potaEnabled.value) return '';
                     
@@ -377,7 +377,7 @@
                         }
                     }
                     
-                    if (wantedEnabled.value && station.dxcc) {
+                    if (wantedMode.value >= 1 && station.dxcc) {
                         const normalized = station.dxcc.toString().trim().replace(/^0+/, '');
                         if (normalized && !qrzConfirmedDxccNumbers.value.has(normalized)) {
                             return 'bg-red-500/30';
@@ -476,6 +476,14 @@
                                     if (qBands.has(b)) return false;
                                 }
                                 return true;
+                            });
+                        }
+                        if (wantedMode.value === 2) {
+                            data = data.filter(s => {
+                                if (s.source === 'POTA' && potaEnabled.value) return true;
+                                if (!s.dxcc) return false;
+                                const normalized = s.dxcc.toString().trim().replace(/^0+/, '');
+                                return normalized && !qrzConfirmedDxccNumbers.value.has(normalized);
                             });
                         }
                         if (searchQuery.value) {
@@ -660,7 +668,7 @@
                     syncStatus, syncQrzData, needsRenewal,
                     qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
                     getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
-                    wantedEnabled, toggleWanted,
+                    wantedMode, toggleWanted,
                 };
             }
         }).mount('#app');
