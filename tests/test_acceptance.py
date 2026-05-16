@@ -1035,6 +1035,21 @@ def test_wanted_button_color_changes(page: Page):
         content_type="application/json",
         body=json.dumps({"has_credentials": True, "callsign": "TEST"}),
     ))
+    page.route("**/qrz-cache", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"exists": True, "count": 0, "data": []}),
+    ))
+    page.route("**/qrz-dxcc-numbers", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"data": []}),
+    ))
+    page.route("**/qrz-all-data", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps({"data": []}),
+    ))
     page.goto("http://localhost:8000")
     
     expect(page.get_by_text("Total Stations")).to_be_visible()

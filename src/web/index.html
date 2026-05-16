@@ -57,7 +57,7 @@
                     <button @click="toggleWanted"
                             :class="wantedMode === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'"
                             class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            :disabled="!qrzCacheInfo.exists || qrzCacheInfo.count === 0">
+                            :disabled="!qrzReady">
                         <i class="fas" :class="wantedMode === 0 ? 'fa-star-half-stroke' : wantedMode === 1 ? 'fa-star' : 'fa-crosshairs'"></i>
                         {{ wantedMode === 0 ? 'Wanted disabled' : wantedMode === 1 ? 'Wanted enabled' : 'Only wanted' }}
                     </button>
