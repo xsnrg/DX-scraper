@@ -41,7 +41,7 @@
                         <i class="fas" :class="syncStatus === 'syncing' ? 'fa-spinner fa-spin' : qrzReady ? 'fa-key' : 'fa-plug'"></i>
                         {{ syncStatus === 'syncing' ? 'Syncing QRZ...' : syncStatus === 'success' ? 'Synced!' : syncStatus === 'error' ? 'Sync Failed' : qrzReady ? 'Refresh QRZ Data' : 'Setup QRZ' }}
                     </button>
-                    <div class="text-xs text-slate-500 mt-1">{{ qrzCacheInfo.last_modified ? 'synced ' + qrzCacheInfo.last_modified : '' }}</div>
+                    <div class="text-xs text-slate-500 mt-1">{{ qrzCacheInfo.last_modified || '' }}</div>
                 </div>
                 <div class="flex flex-col items-center">
                     <button @click="toggleQrzFilter"
