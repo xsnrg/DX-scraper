@@ -951,16 +951,6 @@ def test_map_back_to_dashboard(page: Page):
     expect(page.get_by_role("link", name="DX Monitor")).to_be_visible()
 
 
-# ===========================
-    # Click again to cycle to "Only wanted"
-    page.get_by_role("button", name=re.compile("Wanted")).first.click()
-    expect(page.get_by_role("button", name=re.compile("Only wanted"))).to_be_visible()
-    
-    # Click again to cycle back to disabled
-    page.get_by_role("button", name=re.compile("Wanted")).first.click()
-    expect(page.get_by_role("button", name=re.compile("Wanted disabled"))).to_be_visible()
-
-
 def test_only_wanted_shows_only_wanted_rows(page: Page):
     """Only wanted mode shows only stations with DXCC numbers not in QRZ cache."""
     mock = _mock_data(num_stations=5)
