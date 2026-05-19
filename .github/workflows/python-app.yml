@@ -39,11 +39,16 @@ jobs:
       run: |
         uvicorn src.api:app --host 0.0.0.0 --port 8000 &
         sleep 3
-    - name: Test with pytest
+    - name: Run acceptance tests
       run: |
-        pytest
+        pytest tests/test_acceptance.py
       env:
         PYTHONPATH: .
     - name: Stop FastAPI server
       if: always()
       run: kill %1 2>/dev/null || true
+    - name: Run unit tests
+      run: |
+        pytest --ignore=tests/test_acceptance.py
+      env:
+        PYTHONPATH: .
