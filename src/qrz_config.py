@@ -119,3 +119,22 @@ def save_qrz_data(callsign: str, token: str):
         raise QRZConfigError(
             f"Config file saved but token could not be stored in keyring: {e}"
         )
+
+
+def get_last_sync() -> Optional[str]:
+    _ensure_config_file()
+    try:
+        data = json.loads(_CONFIG_FILE.read_text())
+    except (json.JSONDecodeError, FileNotFoundError):
+        return None
+    return data.get("last_sync")
+
+
+def save_last_sync(timestamp: str):
+    _ensure_config_file()
+    data = get_qrz_data()
+    data["last_sync"] = timestamp
+    try:
+        _atomic_write_config(data)
+    except Exception as e:
+        raise QRZConfigError(f"Failed to write last_sync to config file: {e}")

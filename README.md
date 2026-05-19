@@ -101,24 +101,11 @@ Dashboard is available at [http://localhost:8000](http://localhost:8000).
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
-pytest --ignore=tests/test_acceptance.py  # unit tests (179 tests)
-pytest tests/test_acceptance.py -v        # acceptance tests (75 tests)
+pytest --ignore=tests/test_acceptance.py  # unit tests (245 tests)
 pytest tests/test_service.py -v           # single file
 ```
 
-**Important:** Acceptance tests must be run separately from unit tests. Playwright leaves a running event loop that breaks subsequent async tests.
-
 `pytest.ini` sets `asyncio_mode = auto` and `pythonpath = .`.
-
-### Acceptance Tests
-
-```bash
-export PYTHONPATH=$PYTHONPATH:.
-pytest tests/test_acceptance.py -v  # all acceptance tests (78 tests)
-pytest tests/test_acceptance.py -v -k "spot_age"  # single test
-```
-
-Acceptance tests use **pytest-playwright** (headless Chromium) to verify user-facing dashboard features. Tests cover: dashboard load, stats cards, loading/error states, search, clickable column filters, pagination, spot age filter, POTA toggle, QRZ APIs, DXCC map page, responsive layout, Wanted filter (3-way toggle with red highlight and "only wanted" mode).
 
 ## API Endpoints
 

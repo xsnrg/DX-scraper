@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from .exceptions import QRZDataError
-from .qrz_config import _CONFIG_DIR
+from .qrz_config import _CONFIG_DIR, get_last_sync, save_last_sync
 
 logger = logging.getLogger(__name__)
 
@@ -368,10 +368,10 @@ def _write_cache(records: list[QSORecord], is_full: bool = False):
 
 
 async def sync_qso_data(callsign: str, token: str) -> dict:
+    from datetime import datetime, timedelta, timezone
+
     if not callsign or not token:
         return {'status': 'error', 'error': 'callsign and token are required'}
-
-    cache_exists = QSO_CACHE_FILE.exists()
 
     try:
         session_token = await _authenticate(callsign, token)
@@ -379,32 +379,65 @@ async def sync_qso_data(callsign: str, token: str) -> dict:
         return {'status': 'error', 'error': str(e), 'needs_renewal': True}
 
     try:
-        if not cache_exists:
-            xml = await _fetch_qso_xml(session_token, callsign=callsign)
-            records = _parse_qso_xml(xml)
-            _write_cache(records, is_full=True)
-            return {'status': 'ok', 'total_qsos': len(records), 'synced_count': len(records)}
+        last_sync = get_last_sync()
+
+        # Check if cache has any valid records
+        has_valid_cache = False
+        if QSO_CACHE_FILE.exists():
+            cache_text = QSO_CACHE_FILE.read_text()
+            for line in cache_text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    d = json.loads(line)
+                    if d.get('call'):
+                        has_valid_cache = True
+                        break
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+        if not has_valid_cache:
+            modsince = None
+            logger.info("Full sync (no valid cache records)")
+        elif last_sync:
+            last_dt = datetime.fromisoformat(last_sync)
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            modsince = (last_dt - timedelta(hours=1)).isoformat()
+            logger.info(f"Incremental sync from {modsince} (last_sync={last_sync})")
         else:
+            modsince = None
+            logger.info("Full sync (no previous sync recorded)")
+
+        xml = await _fetch_qso_xml(session_token, time_on_after=modsince, callsign=callsign)
+        records = _parse_qso_xml(xml)
+
+        if not records:
+            # Count existing records in cache for total_qsos
             existing = _read_cache()
-            if not existing:
-                xml = await _fetch_qso_xml(session_token, callsign=callsign)
-                records = _parse_qso_xml(xml)
-                _write_cache(records, is_full=True)
-                return {'status': 'ok', 'total_qsos': len(records), 'synced_count': len(records)}
-
-            last_time_on = existing[-1].time_on
-            if not last_time_on:
-                xml = await _fetch_qso_xml(session_token, callsign=callsign)
-                records = _parse_qso_xml(xml)
-                _write_cache(records, is_full=True)
-                return {'status': 'ok', 'total_qsos': len(records), 'synced_count': len(records)}
-
-            xml = await _fetch_qso_xml(session_token, time_on_after=last_time_on, callsign=callsign)
-            records = _parse_qso_xml(xml)
-            if records:
-                _write_cache(records, is_full=False)
-                return {'status': 'ok', 'total_qsos': len(existing) + len(records), 'synced_count': len(records)}
             return {'status': 'ok', 'total_qsos': len(existing), 'synced_count': 0}
+
+        # Deduplicate by (call, time_on)
+        seen = set()
+        unique_records = []
+        for rec in records:
+            key = (rec.call, rec.time_on)
+            if key not in seen:
+                seen.add(key)
+                unique_records.append(rec)
+
+        # Append to cache file
+        _write_cache(unique_records, is_full=False)
+
+        # Count total records in cache
+        existing = _read_cache()
+
+        # Update last_sync timestamp
+        now = datetime.now(timezone.utc).isoformat()
+        save_last_sync(now)
+
+        return {'status': 'ok', 'total_qsos': len(existing), 'synced_count': len(unique_records)}
     except QRZDataError as e:
         return {'status': 'error', 'error': str(e)}
     except Exception as e:

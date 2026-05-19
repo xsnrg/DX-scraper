@@ -151,7 +151,8 @@ class TestSyncNeedsRenewal:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value=None):
             result = await sync_qso_data('AB1CD', 'badtoken')
 
         assert result['status'] == 'error'
@@ -173,7 +174,8 @@ class TestSyncNeedsRenewal:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value=None):
             result = await sync_qso_data('AB1CD', 'expiredtoken')
 
         assert result['status'] == 'error'
@@ -197,7 +199,8 @@ class TestSyncNeedsRenewal:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value=None):
             result = await sync_qso_data('AB1CD', 'validtoken')
 
         assert result['status'] == 'ok'
@@ -212,7 +215,8 @@ class TestSyncNeedsRenewal:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value=None):
             result = await sync_qso_data('AB1CD', 'testtoken')
 
         assert result['status'] == 'error'

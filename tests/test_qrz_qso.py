@@ -474,7 +474,8 @@ class TestSyncQSOData:
     async def test_full_download_no_cache(self, mock_cache):
         mock_session = self._make_mock_session([AUTH_OK, FETCH_OK])
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value=None):
             result = await sync_qso_data('AB1CD', 'testtoken')
             assert result['status'] == 'ok'
             assert result['total_qsos'] == 2
@@ -495,7 +496,8 @@ class TestSyncQSOData:
 
         mock_session = self._make_mock_session([AUTH_OK, delta_fetch])
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value='2024-01-15T09:00:00+00:00'):
             result = await sync_qso_data('AB1CD', 'testtoken')
             assert result['status'] == 'ok'
             assert result['total_qsos'] == 2
@@ -536,7 +538,8 @@ class TestSyncQSOData:
 
         mock_session = self._make_mock_session([AUTH_OK, FETCH_OK])
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value=None):
             result = await sync_qso_data('AB1CD', 'testtoken')
             assert result['status'] == 'ok'
             assert result['total_qsos'] == 2
@@ -549,7 +552,8 @@ class TestSyncQSOData:
 
         mock_session = self._make_mock_session([AUTH_OK, FETCH_EMPTY])
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value='2024-01-15T09:00:00+00:00'):
             result = await sync_qso_data('AB1CD', 'testtoken')
             assert result['status'] == 'ok'
             assert result['total_qsos'] == 1
