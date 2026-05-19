@@ -49,6 +49,6 @@ jobs:
       run: kill %1 2>/dev/null || true
     - name: Run unit tests
       run: |
-        pytest --ignore=tests/test_acceptance.py
+        pytest tests/test_data_fetchers.py tests/test_exceptions.py tests/test_main.py tests/test_models.py tests/test_bands.py tests/test_service.py tests/test_qrz_qso.py tests/test_qrz_token_renewal.py
       env:
         PYTHONPATH: .
