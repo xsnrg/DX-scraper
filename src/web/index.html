@@ -138,7 +138,7 @@
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-700/50 text-slate-300 text-sm uppercase">
-                            <th v-for="col in columns" :key="col.key" 
+                            <th v-for="col in columns" :key="col.key" :style="col.width ? { width: col.width } : {}" 
                                 @click="setSort(col.key)"
                                 class="px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors"
                                 :class="{'text-blue-400 font-bold': sortKey === col.key, 'sort-asc': sortKey === col.key && sortOrder === 1, 'sort-desc': sortKey === col.key && sortOrder === -1}">
@@ -170,7 +170,7 @@
                             <td class="px-6 py-4">
                                 <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
                             </td>
-                            <td class="px-6 py-4 text-sm font-mono">
+                            <td class="px-6 py-4 text-sm font-mono" style="width: 160px;">
                                 {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : 'N/A' }}
                             </td>
                             <td class="px-6 py-4">
@@ -416,7 +416,7 @@
                     { key: 'dxcc', label: 'DXCC' },
                     { key: 'spotter_country', label: 'Spotter' },
                     { key: 'band', label: 'Band' },
-                    { key: 'frequency', label: 'Frequency' },
+                    { key: 'frequency', label: 'Frequency', width: '160px' },
                     { key: 'mode', label: 'Mode/Comment' },
                     { key: 'last_update', label: 'Updated' },
                     { key: 'source', label: 'Source' },
