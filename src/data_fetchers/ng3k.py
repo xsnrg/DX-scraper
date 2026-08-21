@@ -34,6 +34,16 @@ _AS_CALL = re.compile(
     re.IGNORECASE,
 )
 _SUMMARY = re.compile(r"^(.*?)\s*\(([^)]+)\)\s*$")
+_BANDS = re.compile(
+    r"\b(?:\d+\s*-\s*\d+\s*m|\d+(?:\s+\d+)+\s*m|\d+\s*m|HF|VHF|UHF)\b",
+    re.IGNORECASE,
+)
+# Longer tokens first so FT8/PSK31 win over FT/PSK.
+_MODES = (
+    "PSK31", "MSK144", "JT65", "JT9", "FT8", "FT4", "JS8",
+    "RTTY", "OLIVIA", "MIXED", "WSPR", "Q65",
+    "USB", "LSB", "SSB", "CW", "FM", "AM", "PSK",
+)
 
 
 def _unescape(text: str) -> str:
@@ -99,6 +109,44 @@ def extract_callsigns(summary: str, description: str) -> tuple[str, list[str]]:
     return place, calls
 
 
+def _extract_bands(text: str) -> list[str]:
+    seen: list[str] = []
+    for match in _BANDS.finditer(text):
+        band = re.sub(r"\s+", " ", match.group(0)).strip()
+        if band.lower() not in {b.lower() for b in seen}:
+            seen.append(band)
+    return seen
+
+
+def _extract_modes(text: str) -> list[str]:
+    known = {mode.upper(): mode for mode in _MODES}
+    found: list[str] = []
+    for token in re.findall(r"[A-Za-z0-9]+", text):
+        # NG3K uses "fm" for "from"; do not treat it as FM.
+        if token.lower() in {"fm", "am"} and token not in {"FM", "AM"}:
+            continue
+        canonical = known.get(token.upper())
+        if canonical and canonical not in found:
+            found.append(canonical)
+    return found
+
+
+def compact_comment(description: str, calls: list[str]) -> str:
+    """Keep only operating calls, bands/frequencies, and modes."""
+    text = _unescape(description or "")
+    parts: list[str] = []
+    if calls:
+        parts.append(", ".join(calls))
+    bands = _extract_bands(text)
+    if bands:
+        parts.append(", ".join(bands))
+    modes = _extract_modes(text)
+    if modes:
+        parts.append(" ".join(modes))
+    return " · ".join(parts)
+
+
+
 def _canonical_country(place: str) -> str:
     """Map NG3K place names onto DXCC_LOOKUP keys when we can."""
     if not place:
@@ -159,12 +207,7 @@ def parse_dxcal_ics(text: str, today: Optional[date] = None) -> List[DXStation]:
             event.get("SUMMARY", ""), event.get("DESCRIPTION", "")
         )
         country = _canonical_country(place)
-        comment = _unescape(event.get("DESCRIPTION", "")).replace("  ", " ").strip()
-        range_label = f"{start.strftime('%d %b')}–{end.strftime('%d %b')}"
-        if comment:
-            comment = f"{range_label} · {comment}"[:200]
-        else:
-            comment = range_label
+        comment = compact_comment(event.get("DESCRIPTION", ""), calls)
 
         for call in calls:
             if call in seen:
