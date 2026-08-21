@@ -151,13 +151,15 @@
                             class="hover:bg-slate-700/30 transition-colors"
                             :class="getQrzRowClass(station)">
                             <td class="px-6 py-4 font-mono font-bold text-blue-300">
-                                <a :href="`https://www.qrz.com/db/${station.callsign}`" target="_blank" class="hover:text-blue-400 hover:underline transition-colors">
-                                    {{ station.callsign }}
-                                </a>
-                                <span v-if="station.potential"
-                                      class="ml-2 align-middle text-[10px] uppercase tracking-wide bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/40">
-                                    potential
-                                </span>
+                                <div class="flex flex-col items-start gap-1">
+                                    <a :href="`https://www.qrz.com/db/${station.callsign}`" target="_blank" class="hover:text-blue-400 hover:underline transition-colors">
+                                        {{ station.callsign }}
+                                    </a>
+                                    <span v-if="station.potential"
+                                          class="font-sans font-semibold text-[10px] uppercase tracking-wide bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/40 whitespace-nowrap">
+                                        potential
+                                    </span>
+                                </div>
                             </td>
                             <td class="px-6 py-4">
                                 <template v-if="station.pota_reference">
@@ -175,7 +177,7 @@
                                 <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
                             </td>
                             <td class="px-6 py-4 text-sm font-mono" style="width: 160px;">
-                                {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : 'N/A' }}
+                                {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : '—' }}
                             </td>
                             <td class="px-6 py-4">
                                 <span v-if="station.mode" @click="searchQuery = searchQuery ? searchQuery + ',' + station.mode : station.mode" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.mode }}</span>

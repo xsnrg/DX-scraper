@@ -131,19 +131,18 @@ def _extract_modes(text: str) -> list[str]:
     return found
 
 
-def compact_comment(description: str, calls: list[str]) -> str:
-    """Keep only operating calls, bands/frequencies, and modes."""
+def schedule_fields(description: str) -> tuple[str, str]:
+    """Return (band, mode) from an NG3K description. No dates, QSL, or prose."""
     text = _unescape(description or "")
-    parts: list[str] = []
-    if calls:
-        parts.append(", ".join(calls))
-    bands = _extract_bands(text)
-    if bands:
-        parts.append(", ".join(bands))
-    modes = _extract_modes(text)
-    if modes:
-        parts.append(" ".join(modes))
-    return " · ".join(parts)
+    band = ", ".join(_extract_bands(text))
+    mode = " ".join(_extract_modes(text))
+    return band, mode
+
+
+def compact_comment(description: str, calls: list[str] | None = None) -> str:
+    """Bands and modes only; callsigns live in the callsign column."""
+    band, mode = schedule_fields(description)
+    return " · ".join(part for part in (band, mode) if part)
 
 
 
@@ -207,7 +206,7 @@ def parse_dxcal_ics(text: str, today: Optional[date] = None) -> List[DXStation]:
             event.get("SUMMARY", ""), event.get("DESCRIPTION", "")
         )
         country = _canonical_country(place)
-        comment = compact_comment(event.get("DESCRIPTION", ""), calls)
+        band, mode = schedule_fields(event.get("DESCRIPTION", ""))
 
         for call in calls:
             if call in seen:
@@ -217,7 +216,8 @@ def parse_dxcal_ics(text: str, today: Optional[date] = None) -> List[DXStation]:
                 DXStation(
                     callsign=call,
                     dx_country=country,
-                    comment=comment,
+                    band=band,
+                    mode=mode,
                     last_update=now,
                     source="NG3K",
                     potential=True,
