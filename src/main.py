@@ -19,18 +19,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# CLI --source uses config keys (dx_summit); stations store display names ("DX Summit").
+_SOURCE_ALIASES = {"dxcluster": "dx_cluster"}
+_SOURCE_CHOICES = list(Config.DATA_SOURCES.keys()) + list(_SOURCE_ALIASES.keys())
+
+
+def resolve_source_name(source: Optional[str]) -> Optional[str]:
+    """Map a CLI source key/alias to the live station.source display name."""
+    if not source:
+        return None
+    key = _SOURCE_ALIASES.get(source, source)
+    entry = Config.DATA_SOURCES.get(key)
+    if entry:
+        return entry["name"]
+    return source
+
+
+def _filter_summary_by_source(summary: DXDataSummary, source: Optional[str]) -> DXDataSummary:
+    wanted = resolve_source_name(source)
+    if not wanted:
+        return summary
+    summary.stations = [s for s in summary.stations if s.source == wanted]
+    summary.total_stations = len(summary.stations)
+    summary.active_stations = len([s for s in summary.stations if s.status == "active"])
+    summary.data_sources = list(set(s.source for s in summary.stations))
+    return summary
+
 
 async def main(max_age_seconds: Optional[int] = None, output_format: str = "json", source: Optional[str] = None):
     service = DXPeditionService(max_age_seconds or Config.DATA_MAX_AGE_SECONDS)
     
     try:
         summary = await service.get_current_data(max_age_seconds)
-        
-        if source:
-            summary.stations = [s for s in summary.stations if s.source == source]
-            summary.total_stations = len(summary.stations)
-            summary.active_stations = len([s for s in summary.stations if s.status == "active"])
-            summary.data_sources = list(set(s.source for s in summary.stations))
+        _filter_summary_by_source(summary, source)
 
         if output_format == "json":
             output = {
@@ -78,11 +99,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
 async def run_with_filter(args):
     service = DXPeditionService(args.max_age or Config.DATA_MAX_AGE_SECONDS)
     summary = await service.get_current_data(args.max_age)
-    if args.source:
-        summary.stations = [s for s in summary.stations if s.source == args.source]
-        summary.total_stations = len(summary.stations)
-        summary.active_stations = len([s for s in summary.stations if s.status == "active"])
-        summary.data_sources = list(set(s.source for s in summary.stations))
+    _filter_summary_by_source(summary, args.source)
     return summary
 
 
@@ -92,8 +109,8 @@ def parse_args():
                        help="Maximum age of data in seconds (default: 3600)")
     parser.add_argument("--format", choices=["json", "table"], default="json",
                        help="Output format (default: json)")
-    parser.add_argument("--source", choices=["dx_summit", "dxcluster"],
-                        help="Filter by specific data source")
+    parser.add_argument("--source", choices=_SOURCE_CHOICES,
+                        help="Filter by data source (dx_summit, dx_cluster, dx_news, hamqth, pota)")
     parser.add_argument("--debug-qrz", action="store_true",
                         help="Test QRZ API with stored credentials and print verbose debug output")
     return parser.parse_args()

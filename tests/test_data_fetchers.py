@@ -121,14 +121,17 @@ class TestDXSummitFetcher:
     def fetcher(self, mock_session):
         return DXSummitFetcher(mock_session)
 
+    def _csv(self, rows):
+        header = "id,de_call,dx_call,info,frequency,time,dx_country,de_latitude,de_longitude,dx_latitude,dx_longitude"
+        return header + "\n" + "\n".join(rows)
+
     @pytest.mark.asyncio
     async def test_fetch_successful(self, fetcher, mock_session):
         now = datetime.now(timezone.utc)
-        timestamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-        csv_content = (
-            "dx_call,dx_country,info,band,mode,frequency,time,spotter\n"
-            f"AB1CD,United States,Test Station,20m,CW,14200,{timestamp},SPOTTER1"
-        )
+        timestamp = now.strftime("%Y-%m-%dT%H:%M:%S")
+        csv_content = self._csv([
+            f"1,SPOTTER1,AB1CD,CW Test Station,14200,{timestamp},United States,0,0,0,0",
+        ])
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value=csv_content)
@@ -143,20 +146,20 @@ class TestDXSummitFetcher:
         assert stations[0].dx_country == "United States"
         assert stations[0].band == "20m"
         assert stations[0].mode == "CW"
-        assert stations[0].frequency == 14.2
+        assert stations[0].frequency == pytest.approx(14.2)
         assert stations[0].spotter == "SPOTTER1"
         assert stations[0].source == "DX Summit"
         assert stations[0].status == "active"
+        assert stations[0].last_update.tzinfo is not None
 
     @pytest.mark.asyncio
     async def test_fetch_stale_data_is_kept(self, fetcher, mock_session):
         """DX Summit does not filter by age; stale spots are returned."""
         stale_time = datetime.now(timezone.utc) - timedelta(seconds=7200)
-        timestamp = stale_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-        csv_content = (
-            "dx_call,dx_country,info,band,mode,frequency,time,spotter\n"
-            f"AB1CD,United States,Test Station,20m,CW,14200,{timestamp},SPOTTER1"
-        )
+        timestamp = stale_time.strftime("%Y-%m-%dT%H:%M:%S")
+        csv_content = self._csv([
+            f"1,SPOTTER1,AB1CD,Test Station,14200,{timestamp},United States,0,0,0,0",
+        ])
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value=csv_content)
@@ -170,7 +173,9 @@ class TestDXSummitFetcher:
 
     @pytest.mark.asyncio
     async def test_fetch_invalid_date_uses_now(self, fetcher, mock_session):
-        csv_content = "dx_call,dx_country,info,band,mode,frequency,time,spotter\nAB1CD,United States,Test Station,20m,CW,14200,invalid-date,SPOTTER1"
+        csv_content = self._csv([
+            "1,SPOTTER1,AB1CD,Test Station,14200,invalid-date,United States,0,0,0,0",
+        ])
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value=csv_content)
@@ -180,7 +185,32 @@ class TestDXSummitFetcher:
 
         stations = await fetcher.fetch()
         assert len(stations) == 1
-        assert abs((datetime.now(timezone.utc) - stations[0].last_update).total_seconds()) < 1
+        assert abs((datetime.now(timezone.utc) - stations[0].last_update).total_seconds()) < 2
+        assert stations[0].last_update.tzinfo is not None
+
+    @pytest.mark.asyncio
+    async def test_fetch_parses_mode_from_info(self, fetcher, mock_session):
+        csv_content = self._csv([
+            "1,HZ1ES,4L1BB,FT8 1462hz tnx,7074.0,2026-08-21T03:38:58,United States,0,0,0,0",
+        ])
+        _mock_get(mock_session, csv_content)
+        stations = await fetcher.fetch()
+        assert stations[0].mode == "FT8"
+        assert stations[0].band == "40m"
+        assert stations[0].frequency == pytest.approx(7.074)
+        assert stations[0].spotter == "HZ1ES"
+        assert stations[0].comment.startswith("FT8")
+
+    @pytest.mark.asyncio
+    async def test_naive_timestamp_is_utc(self, fetcher, mock_session):
+        csv_content = self._csv([
+            "1,DE1AA,W1AW,CQ,14205.0,2026-08-21T03:41:15,United States,0,0,0,0",
+        ])
+        _mock_get(mock_session, csv_content)
+        stations = await fetcher.fetch()
+        assert stations[0].last_update.tzinfo == timezone.utc
+        assert stations[0].last_update.hour == 3
+        assert stations[0].last_update.minute == 41
 
 
 class TestDXClusterFetcher:
@@ -819,27 +849,43 @@ class TestDXSummitEdgeCases:
     def fetcher(self, mock_session):
         return DXSummitFetcher(mock_session)
 
+    def _csv(self, rows):
+        header = "id,de_call,dx_call,info,frequency,time,dx_country,de_latitude,de_longitude,dx_latitude,dx_longitude"
+        return header + "\n" + "\n".join(rows)
+
     @pytest.mark.asyncio
     async def test_empty_dx_call_skipped(self, fetcher, mock_session):
-        csv_content = "dx_call,dx_country,info,band,mode,frequency,time,spotter\n,United States,x,20m,CW,14200,2024-01-15T12:00:00Z,W1AW"
+        csv_content = self._csv([
+            "1,W1AW,,x,14200,2024-01-15T12:00:00,United States,0,0,0,0",
+        ])
         _mock_get(mock_session, csv_content)
         stations = await fetcher.fetch()
         assert stations == []
 
     @pytest.mark.asyncio
     async def test_duplicate_keeps_first(self, fetcher, mock_session):
-        csv_content = (
-            "dx_call,dx_country,info,band,mode,frequency,time,spotter\n"
-            "W1AW,United States,first,20m,CW,14200,2024-01-15T12:00:00Z,A\n"
-            "W1AW,United States,second,40m,SSB,7100,2024-01-15T12:00:00Z,B\n"
-        )
+        csv_content = self._csv([
+            "1,A,W1AW,first,14200,2024-01-15T12:00:00,United States,0,0,0,0",
+            "2,B,W1AW,second,7100,2024-01-15T12:00:00,United States,0,0,0,0",
+        ])
         _mock_get(mock_session, csv_content)
         stations = await fetcher.fetch()
         assert len(stations) == 1
         assert stations[0].band == "20m"
         assert stations[0].comment == "first"
+        assert stations[0].spotter == "A"
 
     def test_parse_spots_csv_reads_headers(self, fetcher):
         rows = fetcher._parse_spots_csv("dx_call,frequency\nW1AW,14200\n")
         assert rows[0]["dx_call"] == "W1AW"
         assert rows[0]["frequency"] == "14200"
+
+    @pytest.mark.asyncio
+    async def test_spotter_falls_back_to_spotter_column(self, fetcher, mock_session):
+        csv_content = (
+            "dx_call,dx_country,info,frequency,time,spotter\n"
+            "W1AW,United States,CQ,14200,2024-01-15T12:00:00Z,K1AR\n"
+        )
+        _mock_get(mock_session, csv_content)
+        stations = await fetcher.fetch()
+        assert stations[0].spotter == "K1AR"

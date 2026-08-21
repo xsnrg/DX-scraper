@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
 
-from src.main import main, parse_args, run_with_filter, main_entry
+from src.main import main, parse_args, run_with_filter, main_entry, resolve_source_name
 from src.models import DXStation, DXDataSummary
 from src.service import DXPeditionService
 from src.config import Config
@@ -43,15 +43,15 @@ class TestParseArgs:
             assert args.debug_qrz is True
 
     def test_parse_args_invalid_source_rejected(self):
-        with patch('sys.argv', ['script_name', '--source', 'pota']):
+        with patch('sys.argv', ['script_name', '--source', 'not-a-source']):
             with pytest.raises(SystemExit):
                 parse_args()
 
-    def test_parse_args_source_choices_are_cluster_and_summit_only(self):
-        """CLI --source currently only accepts dx_summit and dxcluster."""
-        with patch('sys.argv', ['script_name', '--source', 'dxcluster']):
-            args = parse_args()
-            assert args.source == "dxcluster"
+    def test_parse_args_accepts_all_configured_sources(self):
+        for key in ("dx_summit", "dx_cluster", "dx_news", "hamqth", "pota", "dxcluster"):
+            with patch('sys.argv', ['script_name', '--source', key]):
+                args = parse_args()
+                assert args.source == key
 
 
 class TestMain:
@@ -149,7 +149,7 @@ class TestMain:
 
     @pytest.mark.asyncio
     async def test_main_filters_by_live_source_name(self, capsys):
-        """main() matches station.source exactly (e.g. 'DX Summit', not 'dx_summit')."""
+        """CLI --source dx_summit matches station.source 'DX Summit'."""
         now = datetime.now(timezone.utc)
         summit = DXStation(
             callsign="W1AW",
@@ -178,7 +178,7 @@ class TestMain:
         )
         with patch.object(DXPeditionService, '__init__', return_value=None):
             with patch.object(DXPeditionService, 'get_current_data', new_callable=AsyncMock, return_value=mock_summary):
-                result = await main(max_age_seconds=3600, output_format="json", source="DX Summit")
+                result = await main(max_age_seconds=3600, output_format="json", source="dx_summit")
         assert result.total_stations == 1
         assert result.stations[0].callsign == "W1AW"
         assert result.data_sources == ["DX Summit"]
@@ -272,7 +272,7 @@ class TestRunWithFilter:
             spotter="Spotter 1",
             band="20m",
             last_update=datetime.now(timezone.utc),
-            source="dx_summit",
+            source="DX Summit",
             status="active"
         )
         station2 = DXStation(
@@ -281,7 +281,7 @@ class TestRunWithFilter:
             spotter="Spotter 2",
             band="40m",
             last_update=datetime.now(timezone.utc),
-            source="dxcluster",
+            source="Spothole",
             status="active"
         )
         
@@ -289,7 +289,7 @@ class TestRunWithFilter:
             total_stations=2,
             active_stations=2,
             last_refresh=datetime.now(timezone.utc),
-            data_sources=["dx_summit", "dxcluster"],
+            data_sources=["DX Summit", "Spothole"],
             stations=[station1, station2]
         )
         
@@ -335,4 +335,21 @@ class TestMainEntry:
                     await main_entry()
                     mock_debug.assert_called_once()
                     mock_main.assert_not_called()
+
+
+class TestResolveSourceName:
+    def test_config_keys_map_to_display_names(self):
+        assert resolve_source_name("dx_summit") == "DX Summit"
+        assert resolve_source_name("dx_cluster") == "Spothole"
+        assert resolve_source_name("dx_news") == "DX News"
+        assert resolve_source_name("hamqth") == "HamQTH"
+        assert resolve_source_name("pota") == "POTA"
+
+    def test_dxcluster_alias(self):
+        assert resolve_source_name("dxcluster") == "Spothole"
+
+    def test_none_and_unknown_passthrough(self):
+        assert resolve_source_name(None) is None
+        assert resolve_source_name("DX Summit") == "DX Summit"
+
 
