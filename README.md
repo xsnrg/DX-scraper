@@ -8,7 +8,7 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 
 ## Features
 
-- **Multi-source aggregation** — DX Summit, Spothole (DX Cluster), DX News, HamQTH, POTA, and NG3K, with callsign deduplication
+- **Multi-source aggregation** — DX Summit, Spothole (DX Cluster), HamQTH, POTA, and NG3K, with callsign deduplication
 - **Potential spots** — NG3K announced DXpeditions that are scheduled to be QRV *today* appear as rows with a yellow `potential` marker and `not spotted` in Updated. Live spots always win; QRZ / Wanted / search still apply; spot-age does not hide them
 - **Real-time dashboard** — Vue 3 + Tailwind UI with auto-refresh, sortable columns, and pagination
 - **QRZ logbook** — Import your QRZ.com log to hide confirmed QSOs and highlight needed DXCC. Token lives in the OS keyring, not on disk
@@ -26,7 +26,6 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 |-----|--------------|---------------------|
 | `dx_summit` | DX Summit | Live cluster spots (CSV) |
 | `dx_cluster` | Spothole | Live cluster spots |
-| `dx_news` | DX News | DXpedition news items |
 | `hamqth` | HamQTH | Live spots |
 | `pota` | POTA | Park activations |
 | `ng3k` | NG3K | Today's announced operations as potential spots |
@@ -78,7 +77,7 @@ PYTHONPATH=. python src/main.py --format json --source ng3k
 PYTHONPATH=. python src/main.py --debug-qrz
 ```
 
-`--source` accepts `dx_summit`, `dx_cluster` (alias `dxcluster`), `dx_news`, `hamqth`, `pota`, `ng3k`.
+`--source` accepts `dx_summit`, `dx_cluster` (alias `dxcluster`), `hamqth`, `pota`, `ng3k`.
 
 ### Docker
 

@@ -54,10 +54,10 @@ class TestDataEndpoint:
                 )
 
         with patch("src.api.DXPeditionService", FakeService):
-            response = client.get("/data?exclude_sources=POTA,%20dx_news")
+            response = client.get("/data?exclude_sources=POTA,%20ng3k")
 
         assert response.status_code == 200
-        assert captured["excluded"] == ["POTA", "dx_news"]
+        assert captured["excluded"] == ["POTA", "ng3k"]
 
     def test_data_without_exclude_does_not_pass_excluded_sources(self):
         captured = {}

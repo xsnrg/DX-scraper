@@ -12,7 +12,6 @@ class TestConfigDefaults:
     def test_all_known_sources_present(self):
         assert set(Config.DATA_SOURCES.keys()) == {
             "dx_cluster",
-            "dx_news",
             "dx_summit",
             "hamqth",
             "pota",
@@ -34,15 +33,15 @@ class TestGetEnabledSources:
     def test_filters_disabled_sources(self, monkeypatch):
         sources = {
             "dx_cluster": {"name": "Spothole", "enabled": True},
-            "dx_news": {"name": "DX News", "enabled": False},
             "dx_summit": {"name": "DX Summit", "enabled": True},
             "hamqth": {"name": "HamQTH", "enabled": False},
             "pota": {"name": "POTA", "enabled": True},
+            "ng3k": {"name": "NG3K", "enabled": False},
         }
         monkeypatch.setattr(Config, "DATA_SOURCES", sources)
         enabled = Config.get_enabled_sources()
         assert set(enabled.keys()) == {"dx_cluster", "dx_summit", "pota"}
-        assert "dx_news" not in enabled
+        assert "ng3k" not in enabled
         assert "hamqth" not in enabled
 
     def test_all_disabled_returns_empty(self, monkeypatch):

@@ -48,7 +48,7 @@ class TestParseArgs:
                 parse_args()
 
     def test_parse_args_accepts_all_configured_sources(self):
-        for key in ("dx_summit", "dx_cluster", "dx_news", "hamqth", "pota", "ng3k", "dxcluster"):
+        for key in ("dx_summit", "dx_cluster", "hamqth", "pota", "ng3k", "dxcluster"):
             with patch('sys.argv', ['script_name', '--source', key]):
                 args = parse_args()
                 assert args.source == key
@@ -341,7 +341,6 @@ class TestResolveSourceName:
     def test_config_keys_map_to_display_names(self):
         assert resolve_source_name("dx_summit") == "DX Summit"
         assert resolve_source_name("dx_cluster") == "Spothole"
-        assert resolve_source_name("dx_news") == "DX News"
         assert resolve_source_name("hamqth") == "HamQTH"
         assert resolve_source_name("pota") == "POTA"
         assert resolve_source_name("ng3k") == "NG3K"

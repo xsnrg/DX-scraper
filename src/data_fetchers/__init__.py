@@ -4,7 +4,6 @@ import logging
 from typing import List, Optional
 
 from .dx_cluster import DXClusterFetcher
-from .dx_news import DXNewsFetcher
 from .dx_summit import DXSummitFetcher
 from .hamqth import HamQTHFetcher
 from .pota import PotaFetcher
@@ -15,7 +14,6 @@ from ..config import Config
 
 __all__ = [
     "DXClusterFetcher",
-    "DXNewsFetcher",
     "DXSummitFetcher",
     "HamQTHFetcher",
     "PotaFetcher",
@@ -30,7 +28,6 @@ async def fetch_all_data(session: aiohttp.ClientSession, excluded_sources: Optio
     excluded_sources = {s.upper() for s in (excluded_sources or [])}
     fetchers_map = {
         "dx_cluster": DXClusterFetcher,
-        "dx_news": DXNewsFetcher,
         "dx_summit": DXSummitFetcher,
         "hamqth": HamQTHFetcher,
         "pota": PotaFetcher,

@@ -8,7 +8,6 @@ from src.data_fetchers import (
     BaseFetcher,
     DXSummitFetcher,
     DXClusterFetcher,
-    DXNewsFetcher,
     PotaFetcher,
     HamQTHFetcher,
     NG3KFetcher,
@@ -382,16 +381,16 @@ class TestFetchAllData:
 
         mocker.patch('src.data_fetchers.DXSummitFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.DXClusterFetcher', return_value=mock_fetcher)
-        mocker.patch('src.data_fetchers.DXNewsFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.HamQTHFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.PotaFetcher', return_value=mock_fetcher)
+        mocker.patch('src.data_fetchers.NG3KFetcher', return_value=mock_fetcher)
 
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
             "dx_cluster": {"enabled": True},
-            "dx_news": {"enabled": True},
             "hamqth": {"enabled": True},
-            "pota": {"enabled": True}
+            "pota": {"enabled": True},
+            "ng3k": {"enabled": True},
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
                 mock_session = AsyncMock()
@@ -411,16 +410,16 @@ class TestFetchAllData:
 
         mocker.patch('src.data_fetchers.DXSummitFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.DXClusterFetcher', return_value=mock_fetcher)
-        mocker.patch('src.data_fetchers.DXNewsFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.HamQTHFetcher', return_value=mock_fetcher)
         mocker.patch('src.data_fetchers.PotaFetcher', return_value=mock_fetcher)
+        mocker.patch('src.data_fetchers.NG3KFetcher', return_value=mock_fetcher)
 
         with patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": True},
             "dx_cluster": {"enabled": False},
-            "dx_news": {"enabled": False},
             "hamqth": {"enabled": False},
-            "pota": {"enabled": False}
+            "pota": {"enabled": False},
+            "ng3k": {"enabled": False},
         }):
             with patch('aiohttp.ClientSession') as mock_session_class:
                 mock_session = AsyncMock()
@@ -644,9 +643,9 @@ class TestPotaFetcher:
         mocker.patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": False},
             "dx_cluster": {"enabled": False},
-            "dx_news": {"enabled": False},
             "hamqth": {"enabled": False},
-            "pota": {"enabled": False}
+            "pota": {"enabled": False},
+            "ng3k": {"enabled": False},
         })
 
         with patch('aiohttp.ClientSession') as mock_session_class:
@@ -729,63 +728,6 @@ class TestHamQTHFetcher:
         assert abs((datetime.now(timezone.utc) - stations[0].last_update).total_seconds()) < 2
 
 
-class TestDXNewsFetcher:
-    @pytest.fixture
-    def mock_session(self):
-        return MagicMock(spec=aiohttp.ClientSession)
-
-    @pytest.fixture
-    def fetcher(self, mock_session):
-        return DXNewsFetcher(mock_session)
-
-    @pytest.mark.asyncio
-    async def test_fetch_parses_rss_title(self, fetcher, mock_session):
-        rss = """<?xml version="1.0"?>
-        <rss version="2.0"><channel>
-          <title>DX News</title>
-          <item>
-            <title>P49P Palau. From DXNews.com</title>
-            <description>DXpedition to Palau</description>
-            <pubDate>Mon, 15 Jan 2024 14:30:00 GMT</pubDate>
-          </item>
-        </channel></rss>
-        """
-        _mock_get(mock_session, rss)
-        stations = await fetcher.fetch()
-        assert len(stations) == 1
-        assert stations[0].callsign == "P49P"
-        assert stations[0].source == "DXNews"
-        assert "DXpedition to Palau" in stations[0].comment
-        assert stations[0].last_update == datetime(2024, 1, 15, 14, 30, tzinfo=timezone.utc)
-
-    @pytest.mark.asyncio
-    async def test_fetch_skips_empty_title(self, fetcher, mock_session):
-        rss = """<?xml version="1.0"?>
-        <rss version="2.0"><channel>
-          <item><title>   </title><description>x</description></item>
-        </channel></rss>
-        """
-        _mock_get(mock_session, rss)
-        stations = await fetcher.fetch()
-        assert stations == []
-
-    @pytest.mark.asyncio
-    async def test_fetch_malformed_xml_returns_empty(self, fetcher, mock_session):
-        _mock_get(mock_session, "not xml at all <<<")
-        stations = await fetcher.fetch()
-        assert stations == []
-
-    @pytest.mark.asyncio
-    async def test_fetch_empty_body_returns_empty(self, fetcher, mock_session):
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text = AsyncMock(return_value="")
-        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
-        stations = await fetcher.fetch()
-        assert stations == []
-
-
 class TestFetchAllDataExclude:
     @pytest.mark.asyncio
     async def test_excluded_sources_not_constructed(self, mocker):
@@ -802,15 +744,14 @@ class TestFetchAllDataExclude:
 
         mocker.patch("src.data_fetchers.DXSummitFetcher", make_ctor("dx_summit"))
         mocker.patch("src.data_fetchers.DXClusterFetcher", make_ctor("dx_cluster"))
-        mocker.patch("src.data_fetchers.DXNewsFetcher", make_ctor("dx_news"))
         mocker.patch("src.data_fetchers.HamQTHFetcher", make_ctor("hamqth"))
         mocker.patch("src.data_fetchers.PotaFetcher", make_ctor("pota"))
         mocker.patch("src.data_fetchers.NG3KFetcher", make_ctor("ng3k"))
 
         session = MagicMock()
-        await fetch_all_data(session, excluded_sources=["pota", "DX_NEWS"])
+        await fetch_all_data(session, excluded_sources=["pota", "NG3K"])
         assert "pota" not in constructed
-        assert "dx_news" not in constructed
+        assert "ng3k" not in constructed
         assert "dx_summit" in constructed
         assert "dx_cluster" in constructed
         assert "hamqth" in constructed
@@ -832,7 +773,6 @@ class TestFetchAllDataExclude:
 
         mocker.patch("src.data_fetchers.DXSummitFetcher", return_value=good)
         mocker.patch("src.data_fetchers.DXClusterFetcher", return_value=bad)
-        mocker.patch("src.data_fetchers.DXNewsFetcher", return_value=bad)
         mocker.patch("src.data_fetchers.HamQTHFetcher", return_value=bad)
         mocker.patch("src.data_fetchers.PotaFetcher", return_value=bad)
         mocker.patch("src.data_fetchers.NG3KFetcher", return_value=bad)

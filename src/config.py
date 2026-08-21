@@ -12,7 +12,6 @@ class Config:
     
     DATA_SOURCES = {
         "dx_cluster": {"name": "Spothole", "enabled": True},
-        "dx_news": {"name": "DX News", "enabled": True},
         "dx_summit": {"name": "DX Summit", "enabled": True},
         "hamqth": {"name": "HamQTH", "enabled": True},
         "pota": {"name": "POTA", "enabled": True},

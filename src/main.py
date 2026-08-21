@@ -110,7 +110,7 @@ def parse_args():
     parser.add_argument("--format", choices=["json", "table"], default="json",
                        help="Output format (default: json)")
     parser.add_argument("--source", choices=_SOURCE_CHOICES,
-                        help="Filter by data source (dx_summit, dx_cluster, dx_news, hamqth, pota, ng3k)")
+                        help="Filter by data source (dx_summit, dx_cluster, hamqth, pota, ng3k)")
     parser.add_argument("--debug-qrz", action="store_true",
                         help="Test QRZ API with stored credentials and print verbose debug output")
     return parser.parse_args()
