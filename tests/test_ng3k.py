@@ -117,7 +117,7 @@ class TestCompactComment:
             "By OH3JR as OJ0JR and OH2YL as OJ0YL fm IOTA EU-053; 80-10m; CW SSB FT8; QSL via Club Log OQRS",
             ["OJ0JR", "OJ0YL"],
         )
-        assert comment == "OJ0JR, OJ0YL · 80-10m · CW SSB FT8"
+        assert comment == "80-10m · CW SSB FT8"
         assert "QSL" not in comment
         assert "Aug" not in comment
         assert "IOTA" not in comment
@@ -127,18 +127,18 @@ class TestCompactComment:
             "By SQ9UM as 3B8/SQ9UM; 40-10m; CW FT8 FT4, perhaps SSB",
             ["3B8/SQ9UM"],
         )
-        assert comment == "3B8/SQ9UM · 40-10m · CW FT8 FT4 SSB"
+        assert comment == "40-10m · CW FT8 FT4 SSB"
 
     def test_space_separated_bands(self):
         comment = compact_comment(
             "By IZ1GDB as EA8/IZ1GDB fm Mogan, Gran Canaria; 40 20 15 10m",
             ["EA8/IZ1GDB"],
         )
-        assert comment == "EA8/IZ1GDB · 40 20 15 10m"
+        assert comment == "40 20 15 10m"
 
     def test_hf_only(self):
         comment = compact_comment("By Icelandic Scouts fm Akureyri; HF", ["TF5SS"])
-        assert comment == "TF5SS · HF"
+        assert comment == "HF"
 
 
 class TestParseDxcal:
@@ -180,11 +180,14 @@ class TestParseDxcal:
     def test_comment_is_compact(self):
         stations = parse_dxcal_ics(SAMPLE_ICS, today=date(2026, 8, 21))
         by_call = {s.callsign: s for s in stations}
-        assert by_call["OJ0JR"].comment == "OJ0JR, OJ0YL · 80-10m · CW SSB FT8"
-        assert by_call["RI1FJL"].comment == "RI1FJL · 160-10m · CW SSB"
-        assert by_call["EA8/IZ1GDB"].comment == "EA8/IZ1GDB · 40 20 15 10m"
-        assert "Aug" not in by_call["RI1FJL"].comment
-        assert "QSL" not in by_call["OJ0JR"].comment
+        assert by_call["OJ0JR"].band == "80-10m"
+        assert by_call["OJ0JR"].mode == "CW SSB FT8"
+        assert by_call["RI1FJL"].band == "160-10m"
+        assert by_call["RI1FJL"].mode == "CW SSB"
+        assert by_call["EA8/IZ1GDB"].band == "40 20 15 10m"
+        assert by_call["EA8/IZ1GDB"].mode == ""
+        assert not by_call["OJ0JR"].comment
+        assert "QSL" not in (by_call["OJ0JR"].comment or "")
 
     def test_empty_calendar(self):
         assert parse_dxcal_ics("BEGIN:VCALENDAR\nEND:VCALENDAR\n", today=date(2026, 8, 21)) == []

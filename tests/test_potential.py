@@ -14,10 +14,10 @@ def _with_potential(callsign="RI1FJL", dxcc="61", country="Franz Josef Land"):
         "dxcc": dxcc,
         "spotter_country": "",
         "spotter": "",
-        "band": "",
+        "band": "160-10m",
         "frequency": None,
-        "mode": "",
-        "comment": "15 Aug–29 Aug · 160-10m · CW SSB",
+        "mode": "CW SSB",
+        "comment": "",
         "source": "NG3K",
         "sources": ["NG3K"],
         "pota_reference": None,
@@ -38,6 +38,14 @@ def test_potential_badge_and_not_spotted(page: Page):
     expect(row.get_by_text("not spotted")).to_be_visible()
     live = page.locator("tr").filter(has_text="W1AW")
     expect(live.get_by_text("potential")).to_have_count(0)
+    # Badge is stacked under the call, not inline beside it.
+    badge_box = row.get_by_text("potential", exact=True).bounding_box()
+    call_box = row.get_by_role("link", name="RI1FJL").bounding_box()
+    assert badge_box and call_box
+    assert badge_box["y"] >= call_box["y"] + call_box["height"] - 1
+    expect(row.get_by_text("160-10m")).to_be_visible()
+    expect(row.get_by_text("CW SSB")).to_be_visible()
+
 
 
 def test_potential_survives_spot_age_filter(page: Page):
