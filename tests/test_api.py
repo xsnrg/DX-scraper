@@ -2,19 +2,12 @@ import json
 import pytest
 from pathlib import Path
 from playwright.sync_api import Page, expect
-from conftest import _mock_data
+from conftest import _mock_data, open_dashboard
 
 
 def test_data_api_returns_json(page: Page):
-    """The /data API endpoint returns valid JSON."""
-    page.route("**/data*", lambda route: route.fulfill(
-        status=200,
-        content_type="application/json",
-        body=json.dumps(_mock_data()),
-    ))
-    page.goto("http://localhost:8000")
-    
-    # The dashboard should have loaded data
+    """The dashboard loads mocked /data JSON into the stats cards."""
+    open_dashboard(page, _mock_data())
     expect(page.get_by_text("Total Stations")).to_be_visible()
 
 
