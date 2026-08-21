@@ -7,6 +7,7 @@ import pytest
 
 from src.data_fetchers.ng3k import (
     NG3KFetcher,
+    compact_comment,
     extract_callsigns,
     is_full_call,
     parse_dxcal_ics,
@@ -20,8 +21,8 @@ BEGIN:VEVENT
 SUMMARY:Market Reef (OJ0)
 DTSTART;VALUE=DATE:20260815
 DTEND;VALUE=DATE:20260822
-DESCRIPTION:By OH3JR as OJ0JR and OH2YL as OJ0YL fm IOTA EU-053\\; 80-10m\\; CW
- SSB FT8
+DESCRIPTION:By OH3JR as OJ0JR and OH2YL as OJ0YL fm IOTA EU-053\\; 80-10m\\;
+  CW SSB FT8
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Franz Josef Land (RI1FJL)
@@ -110,6 +111,36 @@ class TestCallsignHelpers:
         assert calls == []
 
 
+class TestCompactComment:
+    def test_strips_dates_qsl_and_prose(self):
+        comment = compact_comment(
+            "By OH3JR as OJ0JR and OH2YL as OJ0YL fm IOTA EU-053; 80-10m; CW SSB FT8; QSL via Club Log OQRS",
+            ["OJ0JR", "OJ0YL"],
+        )
+        assert comment == "OJ0JR, OJ0YL · 80-10m · CW SSB FT8"
+        assert "QSL" not in comment
+        assert "Aug" not in comment
+        assert "IOTA" not in comment
+
+    def test_perhaps_ssb_still_counts(self):
+        comment = compact_comment(
+            "By SQ9UM as 3B8/SQ9UM; 40-10m; CW FT8 FT4, perhaps SSB",
+            ["3B8/SQ9UM"],
+        )
+        assert comment == "3B8/SQ9UM · 40-10m · CW FT8 FT4 SSB"
+
+    def test_space_separated_bands(self):
+        comment = compact_comment(
+            "By IZ1GDB as EA8/IZ1GDB fm Mogan, Gran Canaria; 40 20 15 10m",
+            ["EA8/IZ1GDB"],
+        )
+        assert comment == "EA8/IZ1GDB · 40 20 15 10m"
+
+    def test_hf_only(self):
+        comment = compact_comment("By Icelandic Scouts fm Akureyri; HF", ["TF5SS"])
+        assert comment == "TF5SS · HF"
+
+
 class TestParseDxcal:
     def test_active_today_only(self):
         stations = parse_dxcal_ics(SAMPLE_ICS, today=date(2026, 8, 21))
@@ -146,11 +177,14 @@ class TestParseDxcal:
         assert by_call["EA8/IZ1GDB"].dx_country == "Canary Islands"
         assert by_call["3B8/SQ9UM"].dx_country == "Mauritius"
 
-    def test_comment_includes_date_range(self):
+    def test_comment_is_compact(self):
         stations = parse_dxcal_ics(SAMPLE_ICS, today=date(2026, 8, 21))
-        ri = next(s for s in stations if s.callsign == "RI1FJL")
-        assert "15 Aug" in ri.comment
-        assert "29 Aug" in ri.comment
+        by_call = {s.callsign: s for s in stations}
+        assert by_call["OJ0JR"].comment == "OJ0JR, OJ0YL · 80-10m · CW SSB FT8"
+        assert by_call["RI1FJL"].comment == "RI1FJL · 160-10m · CW SSB"
+        assert by_call["EA8/IZ1GDB"].comment == "EA8/IZ1GDB · 40 20 15 10m"
+        assert "Aug" not in by_call["RI1FJL"].comment
+        assert "QSL" not in by_call["OJ0JR"].comment
 
     def test_empty_calendar(self):
         assert parse_dxcal_ics("BEGIN:VCALENDAR\nEND:VCALENDAR\n", today=date(2026, 8, 21)) == []
