@@ -20,6 +20,7 @@ class DXStation(BaseModel):
     sources: list[str] = []
     pota_reference: str = ""
     status: str = "active"
+    potential: bool = False
 
     @field_validator("callsign")
     @classmethod

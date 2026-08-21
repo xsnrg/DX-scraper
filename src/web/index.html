@@ -154,6 +154,10 @@
                                 <a :href="`https://www.qrz.com/db/${station.callsign}`" target="_blank" class="hover:text-blue-400 hover:underline transition-colors">
                                     {{ station.callsign }}
                                 </a>
+                                <span v-if="station.potential"
+                                      class="ml-2 align-middle text-[10px] uppercase tracking-wide bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/40">
+                                    potential
+                                </span>
                             </td>
                             <td class="px-6 py-4">
                                 <template v-if="station.pota_reference">
@@ -178,7 +182,7 @@
                                 <span v-else-if="station.comment" @click="searchQuery = searchQuery ? searchQuery + ',' + station.comment : station.comment" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.comment }}</span>
                                 <span v-else>-</span>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-400">{{ formatDate(station.last_update) }}</td>
+                            <td class="px-6 py-4 text-sm text-slate-400">{{ station.potential ? 'not spotted' : formatDate(station.last_update) }}</td>
                             <td class="px-6 py-4">
                                 <span class="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded-full border border-blue-700/50 whitespace-nowrap">
                                     {{ (station.sources && station.sources.length) ? station.sources.join(', ') : station.source }}
@@ -457,6 +461,7 @@
                         let data = [...summary.value.stations];
                         const cutoffTime = Date.now() - maxAgeMinutes.value * 60 * 1000;
                         data = data.filter(s => {
+                            if (s.potential) return true;
                             const updateTime = new Date(s.last_update).getTime();
                             return updateTime >= cutoffTime;
                         });
@@ -492,7 +497,8 @@
                             data = data.filter(s => {
                                 const searchable = [
                                     s.callsign, s.dx_country, s.spotter_country, s.spotter,
-                                    s.band, s.mode, s.comment, s.source, s.frequency
+                                    s.band, s.mode, s.comment, s.source, s.frequency,
+                                    s.potential ? 'potential' : ''
                                 ].filter(Boolean).map(v => v.toString().toLowerCase());
                                 return orGroups.some(andGroup => 
                                     andGroup.every(term => 

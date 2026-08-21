@@ -8,6 +8,7 @@ from .dx_news import DXNewsFetcher
 from .dx_summit import DXSummitFetcher
 from .hamqth import HamQTHFetcher
 from .pota import PotaFetcher
+from .ng3k import NG3KFetcher
 from .base import BaseFetcher
 from ..models import DXStation
 from ..config import Config
@@ -18,6 +19,7 @@ __all__ = [
     "DXSummitFetcher",
     "HamQTHFetcher",
     "PotaFetcher",
+    "NG3KFetcher",
 ]
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ async def fetch_all_data(session: aiohttp.ClientSession, excluded_sources: Optio
         "dx_summit": DXSummitFetcher,
         "hamqth": HamQTHFetcher,
         "pota": PotaFetcher,
+        "ng3k": NG3KFetcher,
     }
 
     fetchers = [

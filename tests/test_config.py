@@ -16,6 +16,7 @@ class TestConfigDefaults:
             "dx_summit",
             "hamqth",
             "pota",
+            "ng3k",
         }
 
     def test_sources_have_name_and_enabled(self):
