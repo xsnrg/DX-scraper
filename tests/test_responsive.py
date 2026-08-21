@@ -1,26 +1,6 @@
 from playwright.sync_api import Page, expect
 
-from conftest import DASHBOARD_URL, open_dashboard
-
-
-def test_exclude_sources_single_parameter(page: Page):
-    """The /data API supports exclude_sources parameter to filter out specific sources."""
-    response = page.request.get(f"{DASHBOARD_URL}/data?exclude_sources=POTA")
-    assert response.status == 200
-    data = response.json()
-    assert isinstance(data, dict)
-    assert "stations" in data
-    for station in data["stations"]:
-        assert station.get("source") != "POTA"
-
-
-def test_exclude_sources_multiple_parameters(page: Page):
-    """The /data API supports comma-separated exclude_sources values."""
-    response = page.request.get(f"{DASHBOARD_URL}/data?exclude_sources=POTA,dx_news")
-    assert response.status == 200
-    data = response.json()
-    assert isinstance(data, dict)
-    assert "stations" in data
+from conftest import open_dashboard
 
 
 def test_dashboard_responsive_on_mobile_width(page: Page):

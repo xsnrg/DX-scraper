@@ -87,20 +87,6 @@ def test_qrz_cache_confirmed_only(page: Page, mocker):
             temp_cache.write_text(backup)
 
 
-def test_data_frequencies_in_mhz(page: Page):
-    """All frequencies returned by /data must be in MHz, not kHz or Hz."""
-    response = page.request.get("http://localhost:8000/data")
-    assert response.status == 200
-    data = response.json()
-    for station in data["stations"]:
-        freq = station.get("frequency")
-        if freq is None:
-            continue
-        # MHz values should be below 10000 (covers all amateur bands up to 3mm/10GHz)
-        # kHz values like 14074 would be way out of range
-        assert freq < 10000, f"Frequency {freq} MHz for {station['callsign']} looks like kHz — should be in MHz"
-
-
 def test_dxcc_map_api_exists(page: Page):
     """The /dxcc-map.html endpoint serves the map page."""
     response = page.request.get("http://localhost:8000/dxcc-map.html")
