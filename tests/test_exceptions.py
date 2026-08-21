@@ -1,10 +1,11 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 import pytest
-from exceptions import DXDataError, DataSourceError, DataValidationException, DataStalenessException
+from src.exceptions import (
+    DXDataError,
+    DataSourceError,
+    DataValidationException,
+    DataStalenessException,
+    QRZDataError,
+)
 
 
 class TestDXDataError:
@@ -100,3 +101,16 @@ class TestDataStalenessException:
         assert exc_info.value.max_age == 60
         assert exc_info.value.actual_age == 120
         assert "Data is too old" in str(exc_info.value)
+
+
+class TestQRZDataError:
+    """Tests for QRZDataError exception class"""
+
+    def test_qrz_data_error_message_prefix(self):
+        error = QRZDataError("Invalid key")
+        assert str(error) == "QRZ QSO error: Invalid key"
+
+    def test_qrz_data_error_is_dx_data_error(self):
+        assert issubclass(QRZDataError, DXDataError)
+        with pytest.raises(DXDataError):
+            raise QRZDataError("auth failed")

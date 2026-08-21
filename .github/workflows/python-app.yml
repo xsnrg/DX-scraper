@@ -41,7 +41,7 @@ jobs:
         sleep 3
     - name: Run acceptance tests
       run: |
-        pytest tests/test_api.py tests/test_column_filter.py tests/test_dashboard.py tests/test_data_table.py tests/test_map.py tests/test_pagination.py tests/test_pota.py tests/test_qrz.py tests/test_responsive.py tests/test_search.py tests/test_sorting.py tests/test_spot_age.py tests/test_wanted.py
+        pytest -m acceptance
       env:
         PYTHONPATH: .
     - name: Stop FastAPI server
@@ -49,6 +49,6 @@ jobs:
       run: kill %1 2>/dev/null || true
     - name: Run unit tests
       run: |
-        pytest tests/test_data_fetchers.py tests/test_exceptions.py tests/test_main.py tests/test_models.py tests/test_bands.py tests/test_service.py tests/test_qrz_qso.py tests/test_qrz_token_renewal.py
+        pytest -m "not acceptance"
       env:
         PYTHONPATH: .

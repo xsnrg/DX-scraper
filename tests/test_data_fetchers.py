@@ -10,6 +10,7 @@ from src.data_fetchers import (
     DXClusterFetcher,
     DXNewsFetcher,
     PotaFetcher,
+    HamQTHFetcher,
     fetch_all_data
 )
 from src.models import DXStation
@@ -58,6 +59,58 @@ class TestBaseFetcher:
 
         assert base_fetcher.validate_age(last_update) is False
 
+    def test_validate_age_naive_datetime_treated_as_utc(self, base_fetcher):
+        last_update = datetime.now() - timedelta(seconds=100)
+        assert last_update.tzinfo is None
+        assert base_fetcher.validate_age(last_update) is True
+
+    def test_validate_all_stations_empty_raises(self, base_fetcher):
+        with pytest.raises(DataStalenessException) as exc:
+            base_fetcher.validate_all_stations([])
+        assert exc.value.actual_age == 0
+
+    @pytest.mark.asyncio
+    async def test_fetch_with_retry_http_error_then_success(self, mock_session, base_fetcher):
+        fail = AsyncMock()
+        fail.status = 500
+        fail.text = AsyncMock(return_value="err")
+        ok = AsyncMock()
+        ok.status = 200
+        ok.text = AsyncMock(return_value="ok")
+
+        mock_session.get.side_effect = [
+            MagicMock(__aenter__=AsyncMock(return_value=fail), __aexit__=AsyncMock(return_value=None)),
+            MagicMock(__aenter__=AsyncMock(return_value=ok), __aexit__=AsyncMock(return_value=None)),
+        ]
+        with patch('asyncio.sleep', new_callable=AsyncMock):
+            result = await base_fetcher.fetch_with_retry("http://test.com")
+        assert result == "ok"
+
+    @pytest.mark.asyncio
+    async def test_fetch_with_retry_http_errors_exhausted(self, mock_session, base_fetcher):
+        fail = AsyncMock()
+        fail.status = 503
+        fail.text = AsyncMock(return_value="err")
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=fail)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        with patch('asyncio.sleep', new_callable=AsyncMock):
+            with pytest.raises(DataSourceError) as exc:
+                await base_fetcher.fetch_with_retry("http://test.com")
+        assert exc.value.source == "TestFetcher"
+
+    @pytest.mark.asyncio
+    async def test_fetch_with_retry_generic_exception_then_success(self, mock_session, base_fetcher):
+        ok = AsyncMock()
+        ok.status = 200
+        ok.text = AsyncMock(return_value="recovered")
+        mock_session.get.side_effect = [
+            RuntimeError("connection reset"),
+            MagicMock(__aenter__=AsyncMock(return_value=ok), __aexit__=AsyncMock(return_value=None)),
+        ]
+        with patch('asyncio.sleep', new_callable=AsyncMock):
+            result = await base_fetcher.fetch_with_retry("http://test.com")
+        assert result == "recovered"
+
 
 class TestDXSummitFetcher:
     @pytest.fixture
@@ -72,7 +125,10 @@ class TestDXSummitFetcher:
     async def test_fetch_successful(self, fetcher, mock_session):
         now = datetime.now(timezone.utc)
         timestamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-        csv_content = "dx_call,op_name,op_country,info,band,mode,frequency,tx_power,time,spotter_call,spotter_op_name,spotter_op_country,spotter_info,spotter_band,spotter_mode,spotter_frequency,spotter_tx_power,spotter_time,spotter_info\n" + f"AB1CD,Test Op,,Test Station,20m,CW,14200000,100,{timestamp},SPOTTER1,,,,,,"
+        csv_content = (
+            "dx_call,dx_country,info,band,mode,frequency,time,spotter\n"
+            f"AB1CD,United States,Test Station,20m,CW,14200,{timestamp},SPOTTER1"
+        )
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value=csv_content)
@@ -84,17 +140,23 @@ class TestDXSummitFetcher:
 
         assert len(stations) == 1
         assert stations[0].callsign == "AB1CD"
-        assert stations[0].dx_country == ""
+        assert stations[0].dx_country == "United States"
         assert stations[0].band == "20m"
         assert stations[0].mode == "CW"
+        assert stations[0].frequency == 14.2
+        assert stations[0].spotter == "SPOTTER1"
         assert stations[0].source == "DX Summit"
         assert stations[0].status == "active"
 
     @pytest.mark.asyncio
-    async def test_fetch_stale_data_skipped(self, fetcher, mock_session):
+    async def test_fetch_stale_data_is_kept(self, fetcher, mock_session):
+        """DX Summit does not filter by age; stale spots are returned."""
         stale_time = datetime.now(timezone.utc) - timedelta(seconds=7200)
         timestamp = stale_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-        csv_content = "dx_call,op_name,op_country,info,band,mode,frequency,tx_power,time,spotter_call,spotter_op_name,spotter_op_country,spotter_info,spotter_band,spotter_mode,spotter_frequency,spotter_tx_power,spotter_time,spotter_info\n" + f"AB1CD,Test Op,,Test Station,20m,CW,14200000,100,{timestamp},SPOTTER1,,,,,,"
+        csv_content = (
+            "dx_call,dx_country,info,band,mode,frequency,time,spotter\n"
+            f"AB1CD,United States,Test Station,20m,CW,14200,{timestamp},SPOTTER1"
+        )
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value=csv_content)
@@ -108,7 +170,7 @@ class TestDXSummitFetcher:
 
     @pytest.mark.asyncio
     async def test_fetch_invalid_date_uses_now(self, fetcher, mock_session):
-        csv_content = "dx_call,op_name,op_country,info,band,mode,frequency,tx_power,time,spotter_call,spotter_op_name,spotter_op_country,spotter_info,spotter_band,spotter_mode,spotter_frequency,spotter_tx_power,spotter_time,spotter_info\nAB1CD,Test Op,,Test Station,20m,CW,14200000,100,invalid-date,SPOTTER1,,,,,,"
+        csv_content = "dx_call,dx_country,info,band,mode,frequency,time,spotter\nAB1CD,United States,Test Station,20m,CW,14200,invalid-date,SPOTTER1"
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value=csv_content)
@@ -195,6 +257,80 @@ class TestDXClusterFetcher:
         stations = await fetcher.fetch()
         assert len(stations) == 1
         assert stations[0].callsign == "XY9ZZ"
+
+
+    @pytest.mark.asyncio
+    async def test_fetch_skips_empty_callsign(self, fetcher, mock_session):
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [
+            {"dx_call": "  ", "band": "20m", "freq": 14200000, "time_iso": now.isoformat()},
+            {"dx_call": "W1AW", "band": "20m", "freq": 14200000, "time_iso": now.isoformat()},
+        ]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        stations = await fetcher.fetch()
+        assert [s.callsign for s in stations] == ["W1AW"]
+
+    @pytest.mark.asyncio
+    async def test_fetch_duplicate_keeps_first(self, fetcher, mock_session):
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [
+            {"dx_call": "W1AW", "band": "20m", "freq": 14200000, "comment": "first", "time_iso": now.isoformat()},
+            {"dx_call": "W1AW", "band": "40m", "freq": 7074000, "comment": "second", "time_iso": now.isoformat()},
+        ]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        stations = await fetcher.fetch()
+        assert len(stations) == 1
+        assert stations[0].band == "20m"
+        assert stations[0].comment == "first"
+
+    @pytest.mark.asyncio
+    async def test_fetch_converts_hz_to_mhz(self, fetcher, mock_session):
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [{"dx_call": "W1AW", "band": "20m", "freq": 14074000, "time_iso": now.isoformat()}]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        stations = await fetcher.fetch()
+        assert stations[0].frequency == pytest.approx(14.074)
+
+    @pytest.mark.asyncio
+    async def test_fetch_skips_no_band_and_no_frequency(self, fetcher, mock_session):
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [{"dx_call": "W1AW", "band": "", "freq": None, "time_iso": now.isoformat()}]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        with pytest.raises(DataStalenessException):
+            await fetcher.fetch()
+
+    @pytest.mark.asyncio
+    async def test_fetch_skips_stale_spots(self, fetcher, mock_session):
+        import json
+        stale = datetime.now(timezone.utc) - timedelta(seconds=7200)
+        spots = [{"dx_call": "W1AW", "band": "20m", "freq": 14200000, "time_iso": stale.isoformat()}]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        with pytest.raises(DataStalenessException):
+            await fetcher.fetch()
 
 
 class TestFetchAllData:
@@ -490,3 +626,220 @@ class TestPotaFetcher:
             stations = await fetch_all_data(mock_session)
 
             assert len(stations) == 0
+
+
+def _mock_get(session, body):
+    mock_response = AsyncMock()
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value=body)
+    session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+    session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+
+
+class TestHamQTHFetcher:
+    @pytest.fixture
+    def mock_session(self):
+        return MagicMock(spec=aiohttp.ClientSession)
+
+    @pytest.fixture
+    def fetcher(self, mock_session):
+        return HamQTHFetcher(mock_session)
+
+    @pytest.mark.asyncio
+    async def test_fetch_parses_caret_csv(self, fetcher, mock_session):
+        line = "K1AR^14074.0^W1AW^CQ DX^1430 2024-01-15^Y^Y^NA^20M^United States^291"
+        _mock_get(mock_session, line)
+        stations = await fetcher.fetch()
+        assert len(stations) == 1
+        s = stations[0]
+        assert s.callsign == "W1AW"
+        assert s.spotter == "K1AR"
+        assert s.frequency == pytest.approx(14.074)
+        assert s.band == "20M"
+        assert s.dx_country == "United States"
+        assert s.dxcc == "291"
+        assert s.comment == "CQ DX"
+        assert s.source == "HamQTH"
+        assert s.last_update == datetime(2024, 1, 15, 14, 30, tzinfo=timezone.utc)
+
+    @pytest.mark.asyncio
+    async def test_fetch_skips_short_lines(self, fetcher, mock_session):
+        _mock_get(mock_session, "too^few^fields\n")
+        stations = await fetcher.fetch()
+        assert stations == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_skips_empty_callsign(self, fetcher, mock_session):
+        line = "K1AR^14074.0^^CQ DX^1430 2024-01-15^Y^Y^NA^20M^United States^291"
+        _mock_get(mock_session, line)
+        stations = await fetcher.fetch()
+        assert stations == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_missing_adif_column(self, fetcher, mock_session):
+        line = "K1AR^14074.0^W1AW^CQ^1430 2024-01-15^Y^Y^NA^20M^United States"
+        _mock_get(mock_session, line)
+        stations = await fetcher.fetch()
+        assert len(stations) == 1
+        assert stations[0].dxcc == ""
+
+    @pytest.mark.asyncio
+    async def test_fetch_empty_frequency_is_none(self, fetcher, mock_session):
+        line = "K1AR^^W1AW^CQ^1430 2024-01-15^Y^Y^NA^20M^United States^291"
+        _mock_get(mock_session, line)
+        stations = await fetcher.fetch()
+        assert stations[0].frequency is None
+
+    @pytest.mark.asyncio
+    async def test_fetch_bad_date_uses_now(self, fetcher, mock_session):
+        line = "K1AR^14074.0^W1AW^CQ^not-a-date^Y^Y^NA^20M^United States^291"
+        _mock_get(mock_session, line)
+        stations = await fetcher.fetch()
+        assert abs((datetime.now(timezone.utc) - stations[0].last_update).total_seconds()) < 2
+
+
+class TestDXNewsFetcher:
+    @pytest.fixture
+    def mock_session(self):
+        return MagicMock(spec=aiohttp.ClientSession)
+
+    @pytest.fixture
+    def fetcher(self, mock_session):
+        return DXNewsFetcher(mock_session)
+
+    @pytest.mark.asyncio
+    async def test_fetch_parses_rss_title(self, fetcher, mock_session):
+        rss = """<?xml version="1.0"?>
+        <rss version="2.0"><channel>
+          <title>DX News</title>
+          <item>
+            <title>P49P Palau. From DXNews.com</title>
+            <description>DXpedition to Palau</description>
+            <pubDate>Mon, 15 Jan 2024 14:30:00 GMT</pubDate>
+          </item>
+        </channel></rss>
+        """
+        _mock_get(mock_session, rss)
+        stations = await fetcher.fetch()
+        assert len(stations) == 1
+        assert stations[0].callsign == "P49P"
+        assert stations[0].source == "DXNews"
+        assert "DXpedition to Palau" in stations[0].comment
+        assert stations[0].last_update == datetime(2024, 1, 15, 14, 30, tzinfo=timezone.utc)
+
+    @pytest.mark.asyncio
+    async def test_fetch_skips_empty_title(self, fetcher, mock_session):
+        rss = """<?xml version="1.0"?>
+        <rss version="2.0"><channel>
+          <item><title>   </title><description>x</description></item>
+        </channel></rss>
+        """
+        _mock_get(mock_session, rss)
+        stations = await fetcher.fetch()
+        assert stations == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_malformed_xml_returns_empty(self, fetcher, mock_session):
+        _mock_get(mock_session, "not xml at all <<<")
+        stations = await fetcher.fetch()
+        assert stations == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_empty_body_returns_empty(self, fetcher, mock_session):
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value="")
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        stations = await fetcher.fetch()
+        assert stations == []
+
+
+class TestFetchAllDataExclude:
+    @pytest.mark.asyncio
+    async def test_excluded_sources_not_constructed(self, mocker):
+        constructed = []
+
+        def make_ctor(name):
+            def ctor(session):
+                constructed.append(name)
+                m = MagicMock()
+                m.name = name
+                m.fetch = AsyncMock(return_value=[])
+                return m
+            return ctor
+
+        mocker.patch("src.data_fetchers.DXSummitFetcher", make_ctor("dx_summit"))
+        mocker.patch("src.data_fetchers.DXClusterFetcher", make_ctor("dx_cluster"))
+        mocker.patch("src.data_fetchers.DXNewsFetcher", make_ctor("dx_news"))
+        mocker.patch("src.data_fetchers.HamQTHFetcher", make_ctor("hamqth"))
+        mocker.patch("src.data_fetchers.PotaFetcher", make_ctor("pota"))
+
+        session = MagicMock()
+        await fetch_all_data(session, excluded_sources=["pota", "DX_NEWS"])
+        assert "pota" not in constructed
+        assert "dx_news" not in constructed
+        assert "dx_summit" in constructed
+        assert "dx_cluster" in constructed
+        assert "hamqth" in constructed
+
+    @pytest.mark.asyncio
+    async def test_mixed_success_and_failure(self, mocker):
+        good = MagicMock()
+        good.name = "DX Summit"
+        good.fetch = AsyncMock(return_value=[
+            DXStation(
+                callsign="W1AW",
+                source="DX Summit",
+                last_update=datetime.now(timezone.utc),
+            )
+        ])
+        bad = MagicMock()
+        bad.name = "POTA"
+        bad.fetch = AsyncMock(side_effect=Exception("down"))
+
+        mocker.patch("src.data_fetchers.DXSummitFetcher", return_value=good)
+        mocker.patch("src.data_fetchers.DXClusterFetcher", return_value=bad)
+        mocker.patch("src.data_fetchers.DXNewsFetcher", return_value=bad)
+        mocker.patch("src.data_fetchers.HamQTHFetcher", return_value=bad)
+        mocker.patch("src.data_fetchers.PotaFetcher", return_value=bad)
+
+        session = MagicMock()
+        stations = await fetch_all_data(session)
+        assert len(stations) == 1
+        assert stations[0].callsign == "W1AW"
+
+
+class TestDXSummitEdgeCases:
+    @pytest.fixture
+    def mock_session(self):
+        return MagicMock(spec=aiohttp.ClientSession)
+
+    @pytest.fixture
+    def fetcher(self, mock_session):
+        return DXSummitFetcher(mock_session)
+
+    @pytest.mark.asyncio
+    async def test_empty_dx_call_skipped(self, fetcher, mock_session):
+        csv_content = "dx_call,dx_country,info,band,mode,frequency,time,spotter\n,United States,x,20m,CW,14200,2024-01-15T12:00:00Z,W1AW"
+        _mock_get(mock_session, csv_content)
+        stations = await fetcher.fetch()
+        assert stations == []
+
+    @pytest.mark.asyncio
+    async def test_duplicate_keeps_first(self, fetcher, mock_session):
+        csv_content = (
+            "dx_call,dx_country,info,band,mode,frequency,time,spotter\n"
+            "W1AW,United States,first,20m,CW,14200,2024-01-15T12:00:00Z,A\n"
+            "W1AW,United States,second,40m,SSB,7100,2024-01-15T12:00:00Z,B\n"
+        )
+        _mock_get(mock_session, csv_content)
+        stations = await fetcher.fetch()
+        assert len(stations) == 1
+        assert stations[0].band == "20m"
+        assert stations[0].comment == "first"
+
+    def test_parse_spots_csv_reads_headers(self, fetcher):
+        rows = fetcher._parse_spots_csv("dx_call,frequency\nW1AW,14200\n")
+        assert rows[0]["dx_call"] == "W1AW"
+        assert rows[0]["frequency"] == "14200"

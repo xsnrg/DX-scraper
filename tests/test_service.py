@@ -6,6 +6,11 @@ from src.models import DXStation
 from src.service import DXPeditionService
 
 
+@pytest.fixture
+def service():
+    return DXPeditionService(max_age_seconds=3600)
+
+
 class TestDXPeditionService:
     @pytest.fixture
     def service(self):
@@ -223,3 +228,195 @@ class TestDXPeditionService:
     def test_get_station_by_callsign_partial_match(self, service, sample_stations):
         station = service.get_station_by_callsign(sample_stations, "P49")
         assert station is None
+
+
+class TestNormalizeBands:
+    def test_fills_band_from_frequency(self, service):
+        stations = [
+            DXStation(
+                callsign="W1AW",
+                source="DX Summit",
+                band="",
+                frequency=14.074,
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.normalize_bands(stations)
+        assert result[0].band == "20m"
+
+    def test_leaves_existing_band_unchanged(self, service):
+        stations = [
+            DXStation(
+                callsign="W1AW",
+                source="DX Summit",
+                band="40m",
+                frequency=14.074,
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.normalize_bands(stations)
+        assert result[0].band == "40m"
+
+    def test_unknown_frequency_leaves_band_empty(self, service):
+        stations = [
+            DXStation(
+                callsign="W1AW",
+                source="DX Summit",
+                band="",
+                frequency=12.000,
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.normalize_bands(stations)
+        assert result[0].band == ""
+
+    def test_none_frequency_leaves_band_empty(self, service):
+        stations = [
+            DXStation(
+                callsign="W1AW",
+                source="DX Summit",
+                band="",
+                frequency=None,
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.normalize_bands(stations)
+        assert result[0].band == ""
+
+
+class TestResolveDxccNumbers:
+    def test_skips_pota_stations(self, service):
+        stations = [
+            DXStation(
+                callsign="W1AW",
+                source="POTA",
+                dx_country="United States",
+                dxcc="",
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.resolve_dxcc_numbers(stations)
+        assert result[0].dxcc == ""
+
+    def test_strips_leading_zeros(self, service):
+        stations = [
+            DXStation(
+                callsign="W1AW",
+                source="DX Summit",
+                dxcc="0291",
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.resolve_dxcc_numbers(stations)
+        assert result[0].dxcc == "291"
+
+    def test_lookup_from_country_when_dxcc_empty(self, service):
+        stations = [
+            DXStation(
+                callsign="JA1ABC",
+                source="HamQTH",
+                dx_country="Japan",
+                dxcc="",
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.resolve_dxcc_numbers(stations)
+        assert result[0].dxcc == "339"
+
+    def test_unknown_country_becomes_empty(self, service):
+        stations = [
+            DXStation(
+                callsign="XX1XX",
+                source="DX Summit",
+                dx_country="USA",
+                dxcc="",
+                last_update=datetime.now(timezone.utc),
+            )
+        ]
+        result = service.resolve_dxcc_numbers(stations)
+        assert result[0].dxcc == ""
+
+
+class TestDedupPotaPriority:
+    def test_pota_replaces_non_pota_even_if_older(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(
+                callsign="W1AW",
+                source="DX Summit",
+                last_update=now,
+                comment="cluster",
+            ),
+            DXStation(
+                callsign="W1AW",
+                source="POTA",
+                last_update=now - timedelta(minutes=30),
+                pota_reference="US-1",
+                comment="pota",
+            ),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert len(result) == 1
+        assert result[0].source == "POTA"
+        assert result[0].pota_reference == "US-1"
+        assert result[0].sources == ["DX Summit", "POTA"]
+
+    def test_sources_union_is_sorted(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="W1AW", source="Spothole", last_update=now),
+            DXStation(callsign="W1AW", source="DX Summit", last_update=now),
+            DXStation(callsign="W1AW", source="HamQTH", last_update=now),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert result[0].sources == ["DX Summit", "HamQTH", "Spothole"]
+
+
+class TestDatetimeAndActive:
+    def test_filter_by_age_accepts_naive_datetime(self, service):
+        naive_recent = datetime.now()
+        naive_old = datetime.now() - timedelta(hours=5)
+        stations = [
+            DXStation(callsign="NEW1", source="Test", last_update=naive_recent),
+            DXStation(callsign="OLD1", source="Test", last_update=naive_old),
+        ]
+        filtered = service.filter_by_age(stations)
+        callsigns = [s.callsign for s in filtered]
+        assert "NEW1" in callsigns
+        assert "OLD1" not in callsigns
+
+    def test_get_active_bands_drops_inactive(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="ON", source="Test", status="active", last_update=now),
+            DXStation(callsign="OFF", source="Test", status="inactive", last_update=now),
+        ]
+        active = service.get_active_bands(stations)
+        assert [s.callsign for s in active] == ["ON"]
+
+    @pytest.mark.asyncio
+    async def test_get_current_data_passes_excluded_sources(self):
+        service = DXPeditionService(max_age_seconds=3600, excluded_sources=["pota"])
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.return_value = []
+            await service.get_current_data()
+            args, _kwargs = mock_fetch.call_args
+            assert args[1] == ["pota"]
+
+    @pytest.mark.asyncio
+    async def test_get_current_data_runs_band_and_dxcc_pipeline(self, service):
+        now = datetime.now(timezone.utc)
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.return_value = [
+                DXStation(
+                    callsign="JA1ABC",
+                    source="HamQTH",
+                    dx_country="Japan",
+                    band="",
+                    frequency=14.074,
+                    last_update=now,
+                )
+            ]
+            summary = await service.get_current_data()
+        assert summary.stations[0].band == "20m"
+        assert summary.stations[0].dxcc == "339"

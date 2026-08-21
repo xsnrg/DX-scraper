@@ -7,6 +7,21 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit: mark test as a unit test (runs without server)")
 
 
+def pytest_collection_modifyitems(config, items):
+    """Auto-mark Playwright tests (those using the `page` fixture) as acceptance.
+
+    CI runs `pytest -m acceptance` against a live uvicorn process and
+    `pytest -m "not acceptance"` for unit tests, so newly added files are
+    picked up without editing the workflow file list.
+    """
+    for item in items:
+        fixturenames = getattr(item, "fixturenames", ())
+        if "page" in fixturenames:
+            item.add_marker(pytest.mark.acceptance)
+        else:
+            item.add_marker(pytest.mark.unit)
+
+
 def _mock_data(num_stations=15):
     """Generate mock DX data with realistic callsigns and countries."""
     import datetime

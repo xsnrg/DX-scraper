@@ -7,6 +7,19 @@ from src.exceptions import QRZDataError
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def isolate_qrz_config(tmp_path, monkeypatch):
+    """Keep token-renewal tests from writing to ~/.config/dxscraper."""
+    config_dir = tmp_path / "dxscraper"
+    config_dir.mkdir()
+    config_file = config_dir / "dxscraper_config.json"
+    monkeypatch.setattr("src.qrz_config._CONFIG_DIR", config_dir)
+    monkeypatch.setattr("src.qrz_config._CONFIG_FILE", config_file)
+    cache_file = tmp_path / "dxscraper_qso.jsonl"
+    monkeypatch.setattr("src.qrz_qso.QSO_CACHE_FILE", cache_file)
+    return config_dir, config_file
+
+
 class TestQRZTokenValidation:
     """Tests for token validation on POST /qrz-token."""
 

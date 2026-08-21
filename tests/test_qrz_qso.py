@@ -50,6 +50,19 @@ class TestQSORecord:
         assert rec.country == ''
         assert rec.dxcc == ''
 
+    def test_from_xml_parses_elementtree(self):
+        import xml.etree.ElementTree as ET
+        elem = ET.fromstring(
+            "<qso><call>AB1CD</call><time_on>143000</time_on>"
+            "<freq>14.200</freq><mode>CW</mode><grid>DM43</grid></qso>"
+        )
+        rec = QSORecord.from_xml(elem)
+        assert rec.call == 'AB1CD'
+        assert rec.time_on == '143000'
+        assert rec.freq == '14.200'
+        assert rec.mode == 'CW'
+        assert rec.grid == 'DM43'
+
     def test_to_dict(self):
         rec = QSORecord(call='AB1CD', time_on='2024-01-01T00:00:00Z', freq='14.200', mode='CW')
         d = rec.to_dict()
@@ -245,6 +258,16 @@ class TestParseQSOXML:
         assert len(records) == 1
         assert records[0].time_on == '2024-01-15T14:30:00'
 
+    def test_parse_adif_time_on_hhmm(self):
+        adif = '<call>AB1CD</call><time_on>1430</time_on><qso_date>20240115</qso_date><EOR>'
+        records = _parse_qso_xml(adif)
+        assert records[0].time_on == '2024-01-15T14:30'
+
+    def test_parse_adif_six_digit_date_and_hhmm(self):
+        adif = '<call>AB1CD</call><time_on>1430</time_on><qso_date>240115</qso_date><EOR>'
+        records = _parse_qso_xml(adif)
+        assert records[0].time_on == '2024-01-15T14:30'
+
 
 class TestFetchURLDecoding:
     @pytest.mark.asyncio
@@ -389,6 +412,37 @@ class TestAuthenticate:
                 await _authenticate('AB1CD', 'badtoken')
             assert 'FAIL' in str(exc_info.value)
 
+    @pytest.mark.asyncio
+    async def test_auth_returns_session_token_when_present(self):
+        body = 'RESULT=OK&SESSIONTOKEN=session-abc&CALLSIGN=AB1CD'
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.read = AsyncMock(return_value=body.encode())
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=None)
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_resp)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        with patch('aiohttp.ClientSession', return_value=mock_session):
+            token = await _authenticate('AB1CD', 'user-token')
+        assert token == 'session-abc'
+
+    @pytest.mark.asyncio
+    async def test_auth_http_error(self):
+        mock_resp = AsyncMock()
+        mock_resp.status = 500
+        mock_resp.read = AsyncMock(return_value=b'oops')
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=None)
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_resp)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        with patch('aiohttp.ClientSession', return_value=mock_session):
+            with pytest.raises(QRZDataError, match='HTTP error'):
+                await _authenticate('AB1CD', 'tok')
+
 
 class TestFetchQSOXML:
     @pytest.mark.asyncio
@@ -443,6 +497,21 @@ class TestFetchQSOXML:
         with patch('aiohttp.ClientSession', return_value=mock_session):
             with pytest.raises(QRZDataError):
                 await _fetch_qso_xml('testtoken')
+
+    @pytest.mark.asyncio
+    async def test_fetch_count_zero_returns_empty_not_error(self):
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.read = AsyncMock(return_value=b'RESULT=FAIL&COUNT=0&REASON=none')
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=None)
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_resp)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        with patch('aiohttp.ClientSession', return_value=mock_session):
+            adif = await _fetch_qso_xml('testtoken')
+        assert adif == ''
 
 
 class TestSyncQSOData:
@@ -558,3 +627,31 @@ class TestSyncQSOData:
             assert result['status'] == 'ok'
             assert result['total_qsos'] == 1
             assert result['synced_count'] == 0
+
+    def test_read_cache_missing_file(self, mock_cache):
+        records = _read_cache()
+        assert records == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_error_has_no_needs_renewal(self, mock_cache):
+        with patch('src.qrz_qso._authenticate', new_callable=AsyncMock, return_value='tok'), \
+             patch('src.qrz_qso._fetch_qso_xml', new_callable=AsyncMock, side_effect=QRZDataError('fetch failed')):
+            result = await sync_qso_data('AB1CD', 'tok')
+        assert result['status'] == 'error'
+        assert 'needs_renewal' not in result
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_same_call_and_time(self, mock_cache):
+        dup_adif = (
+            '<call>AB1CD</call><time_on>143000</time_on><qso_date>20240115</qso_date><EOR>'
+            '<call>AB1CD</call><time_on>143000</time_on><qso_date>20240115</qso_date><EOR>'
+        )
+        fetch = f'RESULT=OK&COUNT=2&ADIF={dup_adif}'
+        mock_session = self._make_mock_session([AUTH_OK, fetch])
+        with patch('aiohttp.ClientSession', return_value=mock_session), \
+             patch('src.qrz_qso.get_last_sync', return_value=None), \
+             patch('src.qrz_qso.save_last_sync') as mock_save:
+            result = await sync_qso_data('AB1CD', 'testtoken')
+        assert result['status'] == 'ok'
+        assert result['synced_count'] == 1
+        mock_save.assert_called_once()
