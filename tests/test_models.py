@@ -114,6 +114,31 @@ class TestDXStation:
         assert station.callsign == "P49P"
 
 
+    def test_dx_station_optional_field_defaults(self):
+        station = DXStation(callsign="W1AW", source="test_source")
+        assert station.dxcc == ""
+        assert station.pota_reference == ""
+        assert station.sources == []
+        assert station.frequency is None
+        assert station.status == "active"
+
+    def test_dx_station_missing_source_raises(self):
+        with pytest.raises(ValidationError):
+            DXStation(callsign="W1AW")
+
+    def test_dx_station_stores_dxcc_sources_and_pota(self):
+        station = DXStation(
+            callsign="W1AW",
+            source="POTA",
+            dxcc="291",
+            pota_reference="US-1234",
+            sources=["POTA", "DX Summit"],
+        )
+        assert station.dxcc == "291"
+        assert station.pota_reference == "US-1234"
+        assert station.sources == ["POTA", "DX Summit"]
+
+
 class TestDXDataSummary:
     """Tests for DXDataSummary model"""
 
@@ -201,3 +226,8 @@ class TestDXDataSummary:
         copied = summary.model_copy()
         assert copied.total_stations == summary.total_stations
         assert copied is not summary
+
+    def test_dx_data_summary_missing_required_fields(self):
+        with pytest.raises(ValidationError):
+            DXDataSummary(total_stations=1)
+

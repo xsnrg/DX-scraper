@@ -25,6 +25,15 @@ class TestBandRanges:
     def test_unknown_band_returns_none(self):
         assert band_to_range("999m") is None
 
+    def test_remaining_hf_and_vhf_ranges(self):
+        assert band_to_range("30m") == (10.100, 10.150)
+        assert band_to_range("17m") == (18.068, 18.168)
+        assert band_to_range("15m") == (21.000, 21.450)
+        assert band_to_range("12m") == (24.890, 24.990)
+        assert band_to_range("10m") == (28.000, 29.700)
+        assert band_to_range("6m") == (50.000, 54.000)
+        assert band_to_range("2m") == (144.000, 148.000)
+
 
 class TestFrequencyToBand:
     def test_14_074_is_20m(self):
@@ -107,3 +116,7 @@ class TestFrequencyToBand:
 
     def test_between_2m_and_70cm(self):
         assert frequency_to_band(250.000) is None
+
+    def test_zero_and_negative_frequency(self):
+        assert frequency_to_band(0) is None
+        assert frequency_to_band(-14.074) is None

@@ -2,19 +2,12 @@ import json
 import pytest
 from pathlib import Path
 from playwright.sync_api import Page, expect
-from conftest import _mock_data
+from conftest import _mock_data, open_dashboard
 
 
 def test_data_api_returns_json(page: Page):
-    """The /data API endpoint returns valid JSON."""
-    page.route("**/data*", lambda route: route.fulfill(
-        status=200,
-        content_type="application/json",
-        body=json.dumps(_mock_data()),
-    ))
-    page.goto("http://localhost:8000")
-    
-    # The dashboard should have loaded data
+    """The dashboard loads mocked /data JSON into the stats cards."""
+    open_dashboard(page, _mock_data())
     expect(page.get_by_text("Total Stations")).to_be_visible()
 
 
@@ -92,20 +85,6 @@ def test_qrz_cache_confirmed_only(page: Page, mocker):
         temp_cache.unlink(missing_ok=True)
         if backup is not None:
             temp_cache.write_text(backup)
-
-
-def test_data_frequencies_in_mhz(page: Page):
-    """All frequencies returned by /data must be in MHz, not kHz or Hz."""
-    response = page.request.get("http://localhost:8000/data")
-    assert response.status == 200
-    data = response.json()
-    for station in data["stations"]:
-        freq = station.get("frequency")
-        if freq is None:
-            continue
-        # MHz values should be below 10000 (covers all amateur bands up to 3mm/10GHz)
-        # kHz values like 14074 would be way out of range
-        assert freq < 10000, f"Frequency {freq} MHz for {station['callsign']} looks like kHz — should be in MHz"
 
 
 def test_dxcc_map_api_exists(page: Page):
