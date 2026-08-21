@@ -19,11 +19,14 @@ class DXPeditionService:
 
     def filter_by_age(self, stations: List[DXStation]) -> List[DXStation]:
         cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=self.max_age_seconds)
-        filtered = [s for s in stations if self._normalize_datetime(s.last_update) >= cutoff_time]
-        
+        filtered = [
+            s for s in stations
+            if s.potential or self._normalize_datetime(s.last_update) >= cutoff_time
+        ]
+
         if len(filtered) < len(stations):
             logger.info(f"Filtered {len(stations) - len(filtered)} stations older than {self.max_age_seconds}s")
-        
+
         return filtered
 
     def deduplicate_stations(self, stations: List[DXStation]) -> List[DXStation]:
@@ -33,17 +36,26 @@ class DXPeditionService:
             if station.callsign not in seen:
                 seen[station.callsign] = station
                 sources[station.callsign] = {station.source}
-            else:
-                sources[station.callsign].add(station.source)
-                existing = seen[station.callsign]
-                if station.source == "POTA" and existing.source != "POTA":
-                    seen[station.callsign] = station
-                elif self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
-                    seen[station.callsign] = station
-        
+                continue
+
+            existing = seen[station.callsign]
+            # A live spot always replaces a potential; potential never tags a live row.
+            if station.potential and not existing.potential:
+                continue
+            if existing.potential and not station.potential:
+                seen[station.callsign] = station
+                sources[station.callsign] = {station.source}
+                continue
+
+            sources[station.callsign].add(station.source)
+            if station.source == "POTA" and existing.source != "POTA":
+                seen[station.callsign] = station
+            elif self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
+                seen[station.callsign] = station
+
         for callsign in seen:
             seen[callsign].sources = sorted(sources[callsign])
-        
+
         return list(seen.values())
 
     def normalize_bands(self, stations: List[DXStation]) -> List[DXStation]:

@@ -372,6 +372,88 @@ class TestDedupPotaPriority:
         assert result[0].sources == ["DX Summit", "HamQTH", "Spothole"]
 
 
+class TestPotentialSpotDedupAndAge:
+    def test_live_spot_replaces_potential(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(
+                callsign="RI1FJL",
+                source="NG3K",
+                potential=True,
+                last_update=now,
+                comment="calendar",
+            ),
+            DXStation(
+                callsign="RI1FJL",
+                source="DX Summit",
+                last_update=now - timedelta(minutes=10),
+                comment="spotted",
+            ),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert len(result) == 1
+        assert result[0].source == "DX Summit"
+        assert result[0].potential is False
+        assert result[0].sources == ["DX Summit"]
+
+    def test_potential_does_not_replace_live(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(
+                callsign="RI1FJL",
+                source="DX Summit",
+                last_update=now - timedelta(minutes=10),
+            ),
+            DXStation(
+                callsign="RI1FJL",
+                source="NG3K",
+                potential=True,
+                last_update=now,
+            ),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert result[0].source == "DX Summit"
+        assert result[0].potential is False
+        assert "NG3K" not in result[0].sources
+
+    def test_potential_kept_when_no_live_spot(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="W1AW", source="DX Summit", last_update=now),
+            DXStation(
+                callsign="3B8/SQ9UM",
+                source="NG3K",
+                potential=True,
+                last_update=now,
+            ),
+        ]
+        result = service.deduplicate_stations(stations)
+        calls = {s.callsign: s for s in result}
+        assert "3B8/SQ9UM" in calls
+        assert calls["3B8/SQ9UM"].potential is True
+
+    def test_filter_by_age_keeps_potential_even_if_old_timestamp(self, service):
+        old = datetime.now(timezone.utc) - timedelta(days=5)
+        stations = [
+            DXStation(
+                callsign="RI1FJL",
+                source="NG3K",
+                potential=True,
+                last_update=old,
+            ),
+            DXStation(
+                callsign="OLD1",
+                source="DX Summit",
+                last_update=old,
+            ),
+        ]
+        filtered = service.filter_by_age(stations)
+        calls = [s.callsign for s in filtered]
+        assert "RI1FJL" in calls
+        assert "OLD1" not in calls
+
+
+
 class TestDatetimeAndActive:
     def test_filter_by_age_accepts_naive_datetime(self, service):
         naive_recent = datetime.now()

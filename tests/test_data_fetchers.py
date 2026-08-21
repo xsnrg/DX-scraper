@@ -11,6 +11,7 @@ from src.data_fetchers import (
     DXNewsFetcher,
     PotaFetcher,
     HamQTHFetcher,
+    NG3KFetcher,
     fetch_all_data
 )
 from src.models import DXStation
@@ -804,6 +805,7 @@ class TestFetchAllDataExclude:
         mocker.patch("src.data_fetchers.DXNewsFetcher", make_ctor("dx_news"))
         mocker.patch("src.data_fetchers.HamQTHFetcher", make_ctor("hamqth"))
         mocker.patch("src.data_fetchers.PotaFetcher", make_ctor("pota"))
+        mocker.patch("src.data_fetchers.NG3KFetcher", make_ctor("ng3k"))
 
         session = MagicMock()
         await fetch_all_data(session, excluded_sources=["pota", "DX_NEWS"])
@@ -833,6 +835,7 @@ class TestFetchAllDataExclude:
         mocker.patch("src.data_fetchers.DXNewsFetcher", return_value=bad)
         mocker.patch("src.data_fetchers.HamQTHFetcher", return_value=bad)
         mocker.patch("src.data_fetchers.PotaFetcher", return_value=bad)
+        mocker.patch("src.data_fetchers.NG3KFetcher", return_value=bad)
 
         session = MagicMock()
         stations = await fetch_all_data(session)

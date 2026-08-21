@@ -16,6 +16,7 @@ class Config:
         "dx_summit": {"name": "DX Summit", "enabled": True},
         "hamqth": {"name": "HamQTH", "enabled": True},
         "pota": {"name": "POTA", "enabled": True},
+        "ng3k": {"name": "NG3K", "enabled": True},
     }
     @classmethod
     def get_enabled_sources(cls):
