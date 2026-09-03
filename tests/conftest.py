@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-DASHBOARD_URL = "http://localhost:8000"
+DASHBOARD_URL = "http://127.0.0.1:8000"
 
 
 def pytest_configure(config):

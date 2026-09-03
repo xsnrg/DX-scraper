@@ -2,7 +2,7 @@ import json
 import pytest
 from pathlib import Path
 from playwright.sync_api import Page, expect
-from conftest import _mock_data, open_dashboard
+from conftest import DASHBOARD_URL, _mock_data, open_dashboard
 
 
 def test_data_api_returns_json(page: Page):
@@ -13,7 +13,7 @@ def test_data_api_returns_json(page: Page):
 
 def test_qrz_status_api(page: Page):
     """The /qrz-status API endpoint returns expected structure."""
-    response = page.request.get("http://localhost:8000/qrz-status")
+    response = page.request.get(f"{DASHBOARD_URL}/qrz-status")
     data = response.json()
     assert "has_credentials" in data
     assert "callsign" in data
@@ -21,7 +21,7 @@ def test_qrz_status_api(page: Page):
 
 def test_qrz_sync_no_credentials(page: Page):
     """The /qrz-sync API returns 400 when no credentials are configured."""
-    response = page.request.get("http://localhost:8000/qrz-sync")
+    response = page.request.get(f"{DASHBOARD_URL}/qrz-sync")
     # With credentials: returns success; without: returns 400
     if response.status == 400:
         data = response.json()
@@ -35,7 +35,7 @@ def test_qrz_sync_no_credentials(page: Page):
 @pytest.mark.skip(reason="requires real QRZ credentials, not available in CI")
 def test_qrz_sync_with_credentials(page: Page, mocker):
     """The /qrz-sync API returns success when credentials are configured."""
-    response = page.request.get("http://localhost:8000/qrz-sync")
+    response = page.request.get(f"{DASHBOARD_URL}/qrz-sync")
     # With credentials: returns success
     assert response.status == 200
     data = response.json()
@@ -46,7 +46,7 @@ def test_qrz_sync_with_credentials(page: Page, mocker):
 
 def test_qrz_cache_api(page: Page):
     """The /qrz-cache API endpoint returns expected structure."""
-    response = page.request.get("http://localhost:8000/qrz-cache")
+    response = page.request.get(f"{DASHBOARD_URL}/qrz-cache")
     data = response.json()
     assert "exists" in data
     assert "data" in data
@@ -73,7 +73,7 @@ def test_qrz_cache_confirmed_only(page: Page, mocker):
     temp_cache.write_text('\n'.join(json.dumps(d) for d in cache_data))
 
     try:
-        response = page.request.get("http://localhost:8000/qrz-cache")
+        response = page.request.get(f"{DASHBOARD_URL}/qrz-cache")
         assert response.status == 200
         data = response.json()
         assert len(data["data"]) == 2
@@ -89,6 +89,6 @@ def test_qrz_cache_confirmed_only(page: Page, mocker):
 
 def test_dxcc_map_api_exists(page: Page):
     """The /dxcc-map.html endpoint serves the map page."""
-    response = page.request.get("http://localhost:8000/dxcc-map.html")
+    response = page.request.get(f"{DASHBOARD_URL}/dxcc-map.html")
     assert response.status == 200
     assert "DXCC QSL Status Map" in response.text()
