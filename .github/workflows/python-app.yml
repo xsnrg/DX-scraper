@@ -76,8 +76,7 @@ jobs:
       run: kill %1 2>/dev/null || pkill -f "uvicorn src.api:app" || true
 
     # Windows runners tear down Start-Process children at step end, so the
-    # server and Playwright must share one step. Chromium resolves localhost
-    # to ::1, so uvicorn listens on IPv6.
+    # server and Playwright must share one step. Tests use 127.0.0.1.
     - name: Run acceptance tests (Windows)
       if: runner.os == 'Windows' && always() && steps.lint.outcome == 'success'
       shell: pwsh
@@ -87,23 +86,21 @@ jobs:
         $proc = Start-Process -PassThru -WindowStyle Hidden `
           -FilePath $python `
           -WorkingDirectory $ws `
-          -ArgumentList @("-m","uvicorn","src.api:app","--host","::","--port","8000") `
+          -ArgumentList @("-m","uvicorn","src.api:app","--host","127.0.0.1","--port","8000") `
           -RedirectStandardOutput (Join-Path $ws "uvicorn.out") `
           -RedirectStandardError (Join-Path $ws "uvicorn.err")
         $ready = $false
-        $urls = @("http://localhost:8000/", "http://[::1]:8000/")
         for ($i = 0; $i -lt 30; $i++) {
-          foreach ($url in $urls) {
-            try {
-              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2
-              if ($response.StatusCode -ge 200) {
-                Write-Host "Server ready at $url"
-                $ready = $true
-                break
-              }
-            } catch {}
+          try {
+            $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -TimeoutSec 2
+            if ($response.StatusCode -ge 200) {
+              $ready = $true
+              break
+            }
+          } catch {
+            Start-Sleep -Seconds 1
+            continue
           }
-          if ($ready) { break }
           Start-Sleep -Seconds 1
         }
         if (-not $ready) {

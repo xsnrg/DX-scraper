@@ -1,5 +1,6 @@
 """Unit tests for QRZ config file + keyring handling."""
 import json
+import os
 from unittest.mock import patch
 
 import keyring.errors as keyring_errors
@@ -13,6 +14,11 @@ from src.qrz_config import (
     save_last_sync,
     save_qrz_data,
 )
+
+
+def _chmod_modes(mock_chmod):
+    """Permission bits passed to os.chmod, masked to the POSIX mode."""
+    return [c.args[1] & 0o777 for c in mock_chmod.call_args_list]
 
 
 @pytest.fixture
@@ -53,18 +59,26 @@ class TestSaveQrzData:
     def test_config_file_mode_is_600(self, isolated_config):
         _dir, config_file = isolated_config
         with patch("src.qrz_config.keyring.get_password", return_value=None), \
-             patch("src.qrz_config.keyring.set_password"):
+             patch("src.qrz_config.keyring.set_password"), \
+             patch("src.qrz_config.os.chmod", wraps=os.chmod) as mock_chmod:
             save_qrz_data("W1AW", "token")
-        mode = config_file.stat().st_mode & 0o777
-        assert mode == 0o600
+        assert config_file.is_file()
+        assert os.access(config_file, os.R_OK | os.W_OK)
+        assert 0o600 in _chmod_modes(mock_chmod)
+        if os.name != "nt":
+            assert config_file.stat().st_mode & 0o777 == 0o600
 
     def test_config_dir_mode_is_700(self, isolated_config):
         config_dir, _file = isolated_config
         with patch("src.qrz_config.keyring.get_password", return_value=None), \
-             patch("src.qrz_config.keyring.set_password"):
+             patch("src.qrz_config.keyring.set_password"), \
+             patch("src.qrz_config.os.chmod", wraps=os.chmod) as mock_chmod:
             save_qrz_data("W1AW", "token")
-        mode = config_dir.stat().st_mode & 0o777
-        assert mode == 0o700
+        assert config_dir.is_dir()
+        assert os.access(config_dir, os.R_OK | os.W_OK | os.X_OK)
+        assert 0o700 in _chmod_modes(mock_chmod)
+        if os.name != "nt":
+            assert config_dir.stat().st_mode & 0o777 == 0o700
 
     def test_keyring_write_failure_raises_after_file_save(self, isolated_config):
         _dir, config_file = isolated_config
