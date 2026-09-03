@@ -73,25 +73,28 @@ jobs:
       run: |
         $python = (Get-Command python).Source
         $ws = (Get-Location).Path
+        # Chromium on Windows resolves localhost to ::1, so listen on IPv6.
         $proc = Start-Process -PassThru -WindowStyle Hidden `
           -FilePath $python `
           -WorkingDirectory $ws `
-          -ArgumentList @("-m","uvicorn","src.api:app","--host","0.0.0.0","--port","8000") `
+          -ArgumentList @("-m","uvicorn","src.api:app","--host","::","--port","8000") `
           -RedirectStandardOutput (Join-Path $ws "uvicorn.out") `
           -RedirectStandardError (Join-Path $ws "uvicorn.err")
         $proc.Id | Out-File -FilePath (Join-Path $ws "uvicorn.pid") -Encoding ascii
         $ready = $false
+        $urls = @("http://localhost:8000/", "http://[::1]:8000/", "http://127.0.0.1:8000/")
         for ($i = 0; $i -lt 30; $i++) {
-          try {
-            $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -TimeoutSec 2
-            if ($response.StatusCode -ge 200) {
-              $ready = $true
-              break
-            }
-          } catch {
-            Start-Sleep -Seconds 1
-            continue
+          foreach ($url in $urls) {
+            try {
+              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2
+              if ($response.StatusCode -ge 200) {
+                Write-Host "Server ready at $url"
+                $ready = $true
+                break
+              }
+            } catch {}
           }
+          if ($ready) { break }
           Start-Sleep -Seconds 1
         }
         if (-not $ready) {
