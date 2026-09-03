@@ -67,22 +67,31 @@ jobs:
           exit 1
         fi
 
-    - name: Start FastAPI server (Windows)
+    - name: Run acceptance tests (Linux)
+      if: runner.os == 'Linux' && always() && steps.lint.outcome == 'success'
+      run: python -m pytest -m acceptance
+
+    - name: Stop FastAPI server (Linux)
+      if: always() && runner.os == 'Linux'
+      run: kill %1 2>/dev/null || pkill -f "uvicorn src.api:app" || true
+
+    # Windows runners tear down Start-Process children at step end, so the
+    # server and Playwright must share one step. Chromium resolves localhost
+    # to ::1, so uvicorn listens on IPv6.
+    - name: Run acceptance tests (Windows)
       if: runner.os == 'Windows' && always() && steps.lint.outcome == 'success'
       shell: pwsh
       run: |
         $python = (Get-Command python).Source
         $ws = (Get-Location).Path
-        # Chromium on Windows resolves localhost to ::1, so listen on IPv6.
         $proc = Start-Process -PassThru -WindowStyle Hidden `
           -FilePath $python `
           -WorkingDirectory $ws `
           -ArgumentList @("-m","uvicorn","src.api:app","--host","::","--port","8000") `
           -RedirectStandardOutput (Join-Path $ws "uvicorn.out") `
           -RedirectStandardError (Join-Path $ws "uvicorn.err")
-        $proc.Id | Out-File -FilePath (Join-Path $ws "uvicorn.pid") -Encoding ascii
         $ready = $false
-        $urls = @("http://localhost:8000/", "http://[::1]:8000/", "http://127.0.0.1:8000/")
+        $urls = @("http://localhost:8000/", "http://[::1]:8000/")
         for ($i = 0; $i -lt 30; $i++) {
           foreach ($url in $urls) {
             try {
@@ -104,27 +113,12 @@ jobs:
           if (Test-Path (Join-Path $ws "uvicorn.err")) { Get-Content (Join-Path $ws "uvicorn.err") }
           throw "Server did not become ready"
         }
-
-    - name: Run acceptance tests
-      if: always() && steps.lint.outcome == 'success'
-      run: python -m pytest -m acceptance
-
-    - name: Stop FastAPI server (Linux)
-      if: always() && runner.os == 'Linux'
-      run: kill %1 2>/dev/null || pkill -f "uvicorn src.api:app" || true
-
-    - name: Stop FastAPI server (Windows)
-      if: always() && runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        $ws = (Get-Location).Path
-        $pidFile = Join-Path $ws "uvicorn.pid"
-        if (Test-Path $pidFile) {
-          $id = [int]((Get-Content $pidFile | Select-Object -First 1).Trim())
-          if ($id) {
-            Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
-          }
+        try {
+          python -m pytest -m acceptance
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        } finally {
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" |
+            Where-Object { $_.CommandLine -match 'uvicorn src.api:app' } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         }
-        Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" |
-          Where-Object { $_.CommandLine -match 'uvicorn src.api:app' } |
-          ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
