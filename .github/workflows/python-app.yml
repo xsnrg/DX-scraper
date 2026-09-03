@@ -1,4 +1,4 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# Install Python deps, lint, and run unit + acceptance tests on Linux and Windows.
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-testing-python
 
 name: Python application
@@ -8,41 +8,51 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
-    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up Python 3.12
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: "3.12"
+        cache: pip
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        playwright install chromium
+        python -m pip install flake8 pytest
+        python -m pip install -r requirements.txt
+        python -m playwright install chromium
+
     - name: Lint with flake8
       run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
     - name: Run unit tests
+      run: python -m pytest -m "not acceptance"
+
+    - name: Start FastAPI server (Linux)
+      if: runner.os == 'Linux'
       run: |
-        pytest -m "not acceptance"
-      env:
-        PYTHONPATH: .
-    - name: Start FastAPI server
-      run: |
-        uvicorn src.api:app --host 0.0.0.0 --port 8000 &
+        python -m uvicorn src.api:app --host 0.0.0.0 --port 8000 &
         ready=0
         for i in $(seq 1 30); do
           if curl -sf http://127.0.0.1:8000/ >/dev/null; then
@@ -55,11 +65,61 @@ jobs:
           echo "Server did not become ready" >&2
           exit 1
         fi
-    - name: Run acceptance tests
+
+    - name: Start FastAPI server (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
       run: |
-        pytest -m acceptance
-      env:
-        PYTHONPATH: .
-    - name: Stop FastAPI server
-      if: always()
-      run: kill %1 2>/dev/null || true
+        $python = (Get-Command python).Source
+        $ws = (Get-Location).Path
+        $proc = Start-Process -PassThru -WindowStyle Hidden `
+          -FilePath $python `
+          -WorkingDirectory $ws `
+          -ArgumentList @("-m","uvicorn","src.api:app","--host","0.0.0.0","--port","8000") `
+          -RedirectStandardOutput (Join-Path $ws "uvicorn.out") `
+          -RedirectStandardError (Join-Path $ws "uvicorn.err")
+        $proc.Id | Out-File -FilePath (Join-Path $ws "uvicorn.pid") -Encoding ascii
+        $ready = $false
+        for ($i = 0; $i -lt 30; $i++) {
+          try {
+            $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -TimeoutSec 2
+            if ($response.StatusCode -ge 200) {
+              $ready = $true
+              break
+            }
+          } catch {
+            Start-Sleep -Seconds 1
+            continue
+          }
+          Start-Sleep -Seconds 1
+        }
+        if (-not $ready) {
+          Write-Host "--- uvicorn.out ---"
+          if (Test-Path (Join-Path $ws "uvicorn.out")) { Get-Content (Join-Path $ws "uvicorn.out") }
+          Write-Host "--- uvicorn.err ---"
+          if (Test-Path (Join-Path $ws "uvicorn.err")) { Get-Content (Join-Path $ws "uvicorn.err") }
+          throw "Server did not become ready"
+        }
+
+    - name: Run acceptance tests
+      run: python -m pytest -m acceptance
+
+    - name: Stop FastAPI server (Linux)
+      if: always() && runner.os == 'Linux'
+      run: kill %1 2>/dev/null || pkill -f "uvicorn src.api:app" || true
+
+    - name: Stop FastAPI server (Windows)
+      if: always() && runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $ws = (Get-Location).Path
+        $pidFile = Join-Path $ws "uvicorn.pid"
+        if (Test-Path $pidFile) {
+          $id = [int]((Get-Content $pidFile | Select-Object -First 1).Trim())
+          if ($id) {
+            Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+          }
+        }
+        Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" |
+          Where-Object { $_.CommandLine -match 'uvicorn src.api:app' } |
+          ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
