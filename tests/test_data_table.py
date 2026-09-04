@@ -44,16 +44,29 @@ def test_data_table_source_badges(page: Page):
 
 
 def test_data_table_wraps_multiple_source_badges(page: Page):
-    """Each source is its own badge so 'DX Summit, HamQTH, Spothole' is not clipped."""
-    mock = _mock_data(num_stations=1)
+    """Each source is its own badge on one line so names are not clipped."""
+    mock = _mock_data(num_stations=2)
     mock["stations"][0]["source"] = "DX Summit"
     mock["stations"][0]["sources"] = ["DX Summit", "HamQTH", "Spothole"]
+    mock["stations"][1]["source"] = "NG3K"
+    mock["stations"][1]["sources"] = ["NG3K"]
     open_dashboard(page, mock)
-    source_cell = page.locator("table tbody tr").first.locator("td").last
+    rows = page.locator("table tbody tr")
+    source_cell = rows.nth(0).locator("td").last
     expect(source_cell.get_by_text("DX Summit", exact=True)).to_be_visible()
     expect(source_cell.get_by_text("HamQTH", exact=True)).to_be_visible()
     expect(source_cell.get_by_text("Spothole", exact=True)).to_be_visible()
     expect(source_cell.get_by_text("DX Summit, HamQTH")).to_have_count(0)
+
+    multi_h = rows.nth(0).bounding_box()["height"]
+    single_h = rows.nth(1).bounding_box()["height"]
+    assert abs(multi_h - single_h) <= 1
+
+    cell_box = source_cell.bounding_box()
+    for name in ("DX Summit", "HamQTH", "Spothole"):
+        badge_box = source_cell.get_by_text(name, exact=True).bounding_box()
+        assert badge_box["x"] + badge_box["width"] <= cell_box["x"] + cell_box["width"] + 1
+        assert badge_box["y"] + badge_box["height"] <= cell_box["y"] + cell_box["height"] + 1
 
 
 def test_data_table_multiple_spots_same_callsign(page: Page):
