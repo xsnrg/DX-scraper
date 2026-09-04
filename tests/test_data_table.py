@@ -43,6 +43,19 @@ def test_data_table_source_badges(page: Page):
     expect(page.get_by_text("DX Cluster").first).to_be_visible()
 
 
+def test_data_table_wraps_multiple_source_badges(page: Page):
+    """Each source is its own badge so 'DX Summit, HamQTH, Spothole' is not clipped."""
+    mock = _mock_data(num_stations=1)
+    mock["stations"][0]["source"] = "DX Summit"
+    mock["stations"][0]["sources"] = ["DX Summit", "HamQTH", "Spothole"]
+    open_dashboard(page, mock)
+    source_cell = page.locator("table tbody tr").first.locator("td").last
+    expect(source_cell.get_by_text("DX Summit", exact=True)).to_be_visible()
+    expect(source_cell.get_by_text("HamQTH", exact=True)).to_be_visible()
+    expect(source_cell.get_by_text("Spothole", exact=True)).to_be_visible()
+    expect(source_cell.get_by_text("DX Summit, HamQTH")).to_have_count(0)
+
+
 def test_data_table_multiple_spots_same_callsign(page: Page):
     """A DXpedition callsign can appear on more than one band/mode at once."""
     mock = _mock_data(num_stations=2)
