@@ -3,6 +3,47 @@ from typing import Optional
 from datetime import datetime, timezone
 
 
+def live_spot_key(
+    callsign: str,
+    band: str = "",
+    mode: str = "",
+    frequency: Optional[float] = None,
+) -> tuple:
+    """Identity of an on-air spot: one row per callsign + band + mode.
+
+    DXpeditions commonly run several stations at once (20m CW, 17m FT8, …).
+    Frequency is part of the key only when band or mode is missing, so two
+    unmoded spots on different frequencies stay distinct while duplicate
+    reports of the same station still collapse.
+    """
+    call = (callsign or "").upper().strip()
+    band_n = (band or "").strip().lower()
+    mode_n = (mode or "").strip().upper()
+    if band_n and mode_n:
+        return (call, band_n, mode_n)
+    freq = ""
+    if frequency is not None:
+        try:
+            freq = f"{round(float(frequency), 3):.3f}"
+        except (TypeError, ValueError):
+            freq = ""
+    return (call, band_n, mode_n, freq)
+
+
+def station_identity(station: "DXStation") -> tuple:
+    """Dedup key for a station row.
+
+    Potential (calendar) spots are one-per-callsign. Live spots are one row
+    per concurrent station (callsign + band + mode).
+    """
+    call = station.callsign.upper().strip()
+    if station.potential:
+        return ("potential", call)
+    return ("live",) + live_spot_key(
+        station.callsign, station.band, station.mode, station.frequency
+    )
+
+
 class DXStation(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

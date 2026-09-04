@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import logging
 import re
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ import aiohttp
 
 from .base import BaseFetcher
 from ..bands import frequency_to_band
-from ..models import DXStation
+from ..models import DXStation, live_spot_key
 
 logger = logging.getLogger(__name__)
 
@@ -43,41 +44,43 @@ class DXSummitFetcher(BaseFetcher):
     def __init__(self, session: aiohttp.ClientSession):
         super().__init__("DX Summit", session)
         self.api_url = "http://www.dxsummit.fi/api/v1/spots"
-        self.spots_limit = 100
+        self.spots_limit = 250
 
     def _parse_spots_csv(self, csv_data: str) -> List[Dict[str, Any]]:
         reader = csv.DictReader(io.StringIO(csv_data))
         return list(reader)
 
+    def _parse_spots(self, data: str) -> List[Dict[str, Any]]:
+        text = (data or "").lstrip()
+        if text.startswith("[") or text.startswith("{"):
+            parsed = json.loads(data)
+            if isinstance(parsed, dict):
+                parsed = parsed.get("spots") or parsed.get("data") or []
+            if not isinstance(parsed, list):
+                return []
+            return parsed
+        return self._parse_spots_csv(data)
+
     async def fetch(self) -> List[DXStation]:
-        to_time = int(datetime.now(timezone.utc).timestamp())
-        from_time = to_time - (24 * 60 * 60)
-
-        params = {
-            "limit": self.spots_limit,
-            "from_time": from_time,
-            "to_time": to_time,
-            "content_type": "csv",
-            "as_file": "true"
-        }
-
+        params = {"limit": self.spots_limit}
         url = f"{self.api_url}?{urlencode(params)}"
 
-        csv_data = await self.fetch_with_retry(url)
-        if not csv_data:
+        body = await self.fetch_with_retry(url)
+        if not body:
             return []
 
-        spots = self._parse_spots_csv(csv_data)
+        try:
+            spots = self._parse_spots(body)
+        except (json.JSONDecodeError, csv.Error, ValueError) as e:
+            logger.error(f"DX Summit: failed to parse spots: {e}")
+            return []
 
-        stations_map: Dict[str, DXStation] = {}
+        stations_map: Dict[tuple, DXStation] = {}
 
         for spot in spots:
             try:
                 dx_call = (spot.get("dx_call") or "").strip()
                 if not dx_call:
-                    continue
-
-                if dx_call in stations_map:
                     continue
 
                 frequency = float(spot.get("frequency") or 0) / 1000.0
@@ -95,7 +98,11 @@ class DXSummitFetcher(BaseFetcher):
                 dx_country = spot.get("dx_country") or ""
                 spotter = (spot.get("de_call") or spot.get("spotter") or "").strip()
 
-                stations_map[dx_call] = DXStation(
+                key = live_spot_key(dx_call, band, mode, frequency)
+                if key in stations_map:
+                    continue
+
+                stations_map[key] = DXStation(
                     callsign=dx_call,
                     dx_country=dx_country,
                     spotter_country="",

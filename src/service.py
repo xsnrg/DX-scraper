@@ -3,7 +3,7 @@ import aiohttp
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from .models import DXStation, DXDataSummary
+from .models import DXStation, DXDataSummary, station_identity
 from .data_fetchers import fetch_all_data
 from .exceptions import DataStalenessException
 from .bands import frequency_to_band
@@ -30,31 +30,51 @@ class DXPeditionService:
         return filtered
 
     def deduplicate_stations(self, stations: List[DXStation]) -> List[DXStation]:
-        seen: dict[str, DXStation] = {}
-        sources: dict[str, set[str]] = {}
-        for station in stations:
-            if station.callsign not in seen:
-                seen[station.callsign] = station
-                sources[station.callsign] = {station.source}
+        """Merge equivalent reports; keep concurrent stations of the same call.
+
+        Live spots collapse by callsign + band + mode (a DXpedition running
+        20m CW and 17m FT8 is two rows). Duplicate reports of the same
+        station still merge, newest wins, POTA wins over a cluster report
+        of the same station. A potential calendar row is dropped when any
+        live spot exists for that callsign.
+        """
+        seen: dict[tuple, DXStation] = {}
+        sources: dict[tuple, set[str]] = {}
+        live_calls: set[str] = set()
+
+        lives = [s for s in stations if not s.potential]
+        potentials = [s for s in stations if s.potential]
+
+        for station in lives:
+            key = station_identity(station)
+            live_calls.add(station.callsign.upper())
+            if key not in seen:
+                seen[key] = station
+                sources[key] = {station.source}
                 continue
 
-            existing = seen[station.callsign]
-            # A live spot always replaces a potential; potential never tags a live row.
-            if station.potential and not existing.potential:
-                continue
-            if existing.potential and not station.potential:
-                seen[station.callsign] = station
-                sources[station.callsign] = {station.source}
-                continue
-
-            sources[station.callsign].add(station.source)
+            existing = seen[key]
+            sources[key].add(station.source)
             if station.source == "POTA" and existing.source != "POTA":
-                seen[station.callsign] = station
+                seen[key] = station
             elif self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
-                seen[station.callsign] = station
+                seen[key] = station
 
-        for callsign in seen:
-            seen[callsign].sources = sorted(sources[callsign])
+        for station in potentials:
+            if station.callsign.upper() in live_calls:
+                continue
+            key = station_identity(station)
+            if key not in seen:
+                seen[key] = station
+                sources[key] = {station.source}
+                continue
+            existing = seen[key]
+            sources[key].add(station.source)
+            if self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
+                seen[key] = station
+
+        for key in seen:
+            seen[key].sources = sorted(sources[key])
 
         return list(seen.values())
 
@@ -93,8 +113,8 @@ class DXPeditionService:
                 stations = await fetch_all_data(session, self.excluded_sources)
 
             stations = self.filter_by_age(stations)
-            stations = self.deduplicate_stations(stations)
             stations = self.normalize_bands(stations)
+            stations = self.deduplicate_stations(stations)
             stations = self.resolve_dxcc_numbers(stations)
             stations = self.get_active_bands(stations)
             
@@ -119,4 +139,3 @@ class DXPeditionService:
             if station.callsign.upper() == callsign.upper():
                 return station
         return None
-

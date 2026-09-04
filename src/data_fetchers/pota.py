@@ -4,7 +4,8 @@ from typing import List, Dict, Any
 from datetime import datetime, timezone
 
 from .base import BaseFetcher
-from ..models import DXStation
+from ..bands import frequency_to_band
+from ..models import DXStation, live_spot_key
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +23,12 @@ class PotaFetcher(BaseFetcher):
         import json
         spots = json.loads(json_data)
 
-        stations_map: Dict[str, DXStation] = {}
+        stations_map: Dict[tuple, DXStation] = {}
 
         for spot in spots:
             try:
                 activator = (spot.get("activator") or "").strip()
                 if not activator:
-                    continue
-
-                if activator in stations_map:
                     continue
 
                 freq = spot.get("frequency")
@@ -68,6 +66,10 @@ class PotaFetcher(BaseFetcher):
                 if not location_desc and not reference:
                     continue
 
+                band = ""
+                if frequency:
+                    band = frequency_to_band(frequency) or ""
+
                 dx_location = ""
                 if location_desc and reference:
                     dx_location = f"{location_desc}, {reference}"
@@ -85,12 +87,16 @@ class PotaFetcher(BaseFetcher):
                     else:
                         combined_mode_comment = comments
 
-                stations_map[activator] = DXStation(
+                key = live_spot_key(activator, band, mode, frequency)
+                if key in stations_map:
+                    continue
+
+                stations_map[key] = DXStation(
                     callsign=activator,
                     dx_country=dx_location,
                     spotter_country="",
                     spotter=spotter,
-                    band="",
+                    band=band,
                     frequency=frequency,
                     mode=mode,
                     comment=comments[:100],

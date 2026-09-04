@@ -453,6 +453,90 @@ class TestPotentialSpotDedupAndAge:
         assert "OLD1" not in calls
 
 
+class TestMultipleSpotsPerCallsign:
+    def test_keeps_same_callsign_on_different_bands(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="VP6G", source="DX Summit", band="20m", mode="CW",
+                      frequency=14.023, last_update=now),
+            DXStation(callsign="VP6G", source="DX Summit", band="40m", mode="CW",
+                      frequency=7.003, last_update=now),
+            DXStation(callsign="VP6G", source="Spothole", band="17m", mode="FT8",
+                      frequency=18.100, last_update=now),
+        ]
+        result = service.deduplicate_stations(stations)
+        keys = {(s.band, s.mode) for s in result}
+        assert keys == {("20m", "CW"), ("40m", "CW"), ("17m", "FT8")}
+        assert all(s.callsign == "VP6G" for s in result)
+
+    def test_keeps_cw_and_ft8_on_same_band(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="VP6G", source="DX Summit", band="20m", mode="CW",
+                      frequency=14.023, last_update=now),
+            DXStation(callsign="VP6G", source="DX Summit", band="20m", mode="FT8",
+                      frequency=14.074, last_update=now),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert len(result) == 2
+        assert {s.mode for s in result} == {"CW", "FT8"}
+
+    def test_merges_same_band_mode_across_sources(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="VP6G", source="DX Summit", band="20m", mode="CW",
+                      frequency=14.023, last_update=now - timedelta(minutes=5),
+                      comment="older"),
+            DXStation(callsign="VP6G", source="Spothole", band="20m", mode="CW",
+                      frequency=14.024, last_update=now, comment="newer"),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert len(result) == 1
+        assert result[0].comment == "newer"
+        assert result[0].sources == ["DX Summit", "Spothole"]
+
+    def test_potential_dropped_when_any_live_spot_exists(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="VP6G", source="NG3K", potential=True, last_update=now),
+            DXStation(callsign="VP6G", source="DX Summit", band="20m", mode="CW",
+                      frequency=14.023, last_update=now - timedelta(minutes=10)),
+            DXStation(callsign="VP6G", source="DX Summit", band="40m", mode="FT8",
+                      frequency=7.074, last_update=now - timedelta(minutes=8)),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert all(not s.potential for s in result)
+        assert {s.band for s in result} == {"20m", "40m"}
+        assert "NG3K" not in {src for s in result for src in s.sources}
+
+    def test_unmoded_spots_on_different_frequencies_kept(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="W1AW", source="HamQTH", band="20m", mode="",
+                      frequency=14.023, last_update=now),
+            DXStation(callsign="W1AW", source="HamQTH", band="20m", mode="",
+                      frequency=14.074, last_update=now),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert len(result) == 2
+
+    @pytest.mark.asyncio
+    async def test_pipeline_normalizes_band_before_dedup(self, service):
+        now = datetime.now(timezone.utc)
+        with patch("src.service.fetch_all_data") as mock_fetch:
+            mock_fetch.return_value = [
+                DXStation(callsign="VP6G", source="DX Summit", band="",
+                          frequency=14.023, mode="CW", last_update=now),
+                DXStation(callsign="VP6G", source="Spothole", band="",
+                          frequency=7.074, mode="FT8", last_update=now),
+            ]
+            summary = await service.get_current_data()
+        bands = {s.band for s in summary.stations}
+        assert bands == {"20m", "40m"}
+        assert summary.total_stations == 2
+
+
+
 
 class TestDatetimeAndActive:
     def test_filter_by_age_accepts_naive_datetime(self, service):

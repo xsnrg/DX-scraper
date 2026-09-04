@@ -147,7 +147,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-700">
-                        <tr v-for="station in paginatedStations" :key="station.callsign" 
+                        <tr v-for="station in paginatedStations" :key="[station.callsign, station.band, station.mode, station.frequency, station.pota_reference, station.potential].join('|')" 
                             class="hover:bg-slate-700/30 transition-colors"
                             :class="getQrzRowClass(station)">
                             <td class="px-6 py-4 font-mono font-bold text-blue-300">

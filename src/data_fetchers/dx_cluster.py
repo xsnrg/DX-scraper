@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 from datetime import datetime, timezone
 
 from .base import BaseFetcher
-from ..models import DXStation
+from ..models import DXStation, live_spot_key
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +26,12 @@ class DXClusterFetcher(BaseFetcher):
         import json
         spots = json.loads(json_data)
         
-        stations_map: Dict[str, DXStation] = {}
+        stations_map: Dict[tuple, DXStation] = {}
         
         for spot in spots:
             try:
                 dx_call = (spot.get("dx_call") or "").strip()
                 if not dx_call or dx_call.startswith("#"):
-                    continue
-                
-                if dx_call in stations_map:
                     continue
                 
                 freq = spot.get("freq")
@@ -68,7 +65,11 @@ class DXClusterFetcher(BaseFetcher):
                 if not band and frequency is None:
                     continue
 
-                stations_map[dx_call] = DXStation(
+                key = live_spot_key(dx_call, band, mode, frequency)
+                if key in stations_map:
+                    continue
+
+                stations_map[key] = DXStation(
                     callsign=dx_call,
                     dx_country=dx_country,
                     spotter_country="",
