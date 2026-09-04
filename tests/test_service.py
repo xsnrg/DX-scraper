@@ -488,7 +488,7 @@ class TestMultipleSpotsPerCallsign:
                       frequency=14.023, last_update=now - timedelta(minutes=5),
                       comment="older"),
             DXStation(callsign="VP6G", source="Spothole", band="20m", mode="CW",
-                      frequency=14.024, last_update=now, comment="newer"),
+                      frequency=14.0234, last_update=now, comment="newer"),
         ]
         result = service.deduplicate_stations(stations)
         assert len(result) == 1
@@ -534,6 +534,40 @@ class TestMultipleSpotsPerCallsign:
         bands = {s.band for s in summary.stations}
         assert bands == {"20m", "40m"}
         assert summary.total_stations == 2
+
+    def test_hamqth_uppercase_band_merges_with_dx_summit(self, service):
+        now = datetime.now(timezone.utc)
+        stations = service.normalize_bands([
+            DXStation(callsign="RI1FJL", source="HamQTH", band="20M", mode="",
+                      frequency=14.0129, last_update=now, comment="up 1"),
+            DXStation(callsign="RI1FJL", source="DX Summit", band="20m", mode="CW",
+                      frequency=14.0126, last_update=now - timedelta(minutes=2),
+                      comment="up 1 CW"),
+        ])
+        result = service.deduplicate_stations(stations)
+        assert len(result) == 1
+        assert result[0].mode == "CW"
+        assert result[0].band == "20m"
+        assert result[0].sources == ["DX Summit", "HamQTH"]
+
+    def test_ri1fjl_like_multi_station_rows(self, service):
+        now = datetime.now(timezone.utc)
+        stations = [
+            DXStation(callsign="RI1FJL", source="DX Summit", band="30m", mode="FT8",
+                      frequency=10.136, last_update=now),
+            DXStation(callsign="RI1FJL", source="DX Summit", band="20m", mode="CW",
+                      frequency=14.0128, last_update=now),
+            DXStation(callsign="RI1FJL", source="DX Summit", band="20m", mode="FT8",
+                      frequency=14.074, last_update=now),
+            DXStation(callsign="RI1FJL", source="DX Summit", band="15m", mode="FT8",
+                      frequency=21.075, last_update=now),
+            DXStation(callsign="RI1FJL", source="NG3K", potential=True, last_update=now),
+        ]
+        result = service.deduplicate_stations(stations)
+        assert all(not s.potential for s in result)
+        freqs = sorted(round(s.frequency, 3) for s in result)
+        assert freqs == [10.136, 14.013, 14.074, 21.075]
+
 
 
 

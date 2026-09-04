@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional
 from datetime import datetime, timezone
 
+from .bands import canonical_band
+
 
 def live_spot_key(
     callsign: str,
@@ -9,32 +11,31 @@ def live_spot_key(
     mode: str = "",
     frequency: Optional[float] = None,
 ) -> tuple:
-    """Identity of an on-air spot: one row per callsign + band + mode.
+    """Identity of an on-air station: one row per callsign + kHz.
 
-    DXpeditions commonly run several stations at once (20m CW, 17m FT8, …).
-    Frequency is part of the key only when band or mode is missing, so two
-    unmoded spots on different frequencies stay distinct while duplicate
-    reports of the same station still collapse.
+    DXpeditions run several stations at once (20m CW, 20m FT8, 30m FT8).
+    Frequency is the on-air identity; 1 kHz rounding collapses slightly
+    different reports of the same signal. Band/mode are used only when
+    frequency is missing.
     """
     call = (callsign or "").upper().strip()
-    band_n = (band or "").strip().lower()
-    mode_n = (mode or "").strip().upper()
-    if band_n and mode_n:
-        return (call, band_n, mode_n)
-    freq = ""
     if frequency is not None:
         try:
-            freq = f"{round(float(frequency), 3):.3f}"
+            khz = int(round(float(frequency) * 1000))
+            if khz > 0:
+                return (call, khz)
         except (TypeError, ValueError):
-            freq = ""
-    return (call, band_n, mode_n, freq)
+            pass
+    band_n = canonical_band(band)
+    mode_n = (mode or "").strip().upper()
+    return (call, band_n, mode_n)
 
 
 def station_identity(station: "DXStation") -> tuple:
     """Dedup key for a station row.
 
     Potential (calendar) spots are one-per-callsign. Live spots are one row
-    per concurrent station (callsign + band + mode).
+    per concurrent station (callsign + frequency).
     """
     call = station.callsign.upper().strip()
     if station.potential:

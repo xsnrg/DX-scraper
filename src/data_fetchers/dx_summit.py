@@ -2,7 +2,6 @@ import csv
 import io
 import json
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 from urllib.parse import urlencode
@@ -10,24 +9,10 @@ from urllib.parse import urlencode
 import aiohttp
 
 from .base import BaseFetcher
-from ..bands import frequency_to_band
+from ..bands import frequency_to_band, mode_from_text
 from ..models import DXStation, live_spot_key
 
 logger = logging.getLogger(__name__)
-
-# Modes commonly embedded in DX Summit `info` text (longest first).
-_KNOWN_MODES = (
-    "PSK31", "JT65", "JT9", "FT8", "FT4", "RTTY", "DIGI", "SSB", "CW", "AM", "FM",
-)
-_MODE_RE = re.compile(
-    r"\b(" + "|".join(_KNOWN_MODES) + r")\b",
-    re.IGNORECASE,
-)
-
-
-def _mode_from_info(info: str) -> str:
-    match = _MODE_RE.search(info or "")
-    return match.group(1).upper() if match else ""
 
 
 def _parse_time(raw: str) -> datetime:
@@ -62,10 +47,17 @@ class DXSummitFetcher(BaseFetcher):
         return self._parse_spots_csv(data)
 
     async def fetch(self) -> List[DXStation]:
-        params = {"limit": self.spots_limit}
+        params = {
+            "limit": self.spots_limit,
+            "include": "HF",
+        }
         url = f"{self.api_url}?{urlencode(params)}"
+        headers = {
+            "User-Agent": "DX-scraper (https://github.com/xsnrg/DX-scraper)",
+            "Accept": "application/json, text/csv;q=0.8, */*;q=0.5",
+        }
 
-        body = await self.fetch_with_retry(url)
+        body = await self.fetch_with_retry(url, headers=headers)
         if not body:
             return []
 
@@ -94,12 +86,15 @@ class DXSummitFetcher(BaseFetcher):
                     band = frequency_to_band(frequency) or ""
 
                 info = spot.get("info") or ""
-                mode = (spot.get("mode") or "").strip() or _mode_from_info(info)
+                mode = (spot.get("mode") or "").strip() or mode_from_text(info)
                 dx_country = spot.get("dx_country") or ""
                 spotter = (spot.get("de_call") or spot.get("spotter") or "").strip()
 
                 key = live_spot_key(dx_call, band, mode, frequency)
-                if key in stations_map:
+                existing = stations_map.get(key)
+                if existing is not None:
+                    if mode and not existing.mode:
+                        existing.mode = mode
                     continue
 
                 stations_map[key] = DXStation(
@@ -118,4 +113,5 @@ class DXSummitFetcher(BaseFetcher):
                 logger.error(f"Error parsing DX Summit spot: {e}")
                 continue
 
+        logger.info(f"DX Summit: {len(stations_map)} live spots")
         return list(stations_map.values())

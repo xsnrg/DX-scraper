@@ -6,7 +6,7 @@ from typing import List, Optional
 from .models import DXStation, DXDataSummary, station_identity
 from .data_fetchers import fetch_all_data
 from .exceptions import DataStalenessException
-from .bands import frequency_to_band
+from .bands import frequency_to_band, canonical_band, mode_from_text
 from .dxcc import resolve_dxcc
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,13 @@ class DXPeditionService:
             sources[key].add(station.source)
             if station.source == "POTA" and existing.source != "POTA":
                 seen[key] = station
+            elif existing.source == "POTA" and station.source != "POTA":
+                pass
+            elif station.mode and not existing.mode:
+                # Keep DX Summit "FT8" over a HamQTH row of the same kHz with no mode.
+                seen[key] = station
+            elif existing.mode and not station.mode:
+                pass
             elif self._normalize_datetime(station.last_update) > self._normalize_datetime(existing.last_update):
                 seen[key] = station
 
@@ -80,10 +87,14 @@ class DXPeditionService:
 
     def normalize_bands(self, stations: List[DXStation]) -> List[DXStation]:
         for station in stations:
+            if station.band:
+                station.band = canonical_band(station.band)
             if not station.band and station.frequency:
                 computed = frequency_to_band(float(station.frequency))
                 if computed:
                     station.band = computed
+            if not station.mode and station.comment:
+                station.mode = mode_from_text(station.comment)
         return stations
 
     def resolve_dxcc_numbers(self, stations: List[DXStation]) -> List[DXStation]:

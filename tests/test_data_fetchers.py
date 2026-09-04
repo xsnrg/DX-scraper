@@ -311,7 +311,7 @@ class TestDXClusterFetcher:
         now = datetime.now(timezone.utc)
         spots = [
             {"dx_call": "W1AW", "band": "20m", "mode": "CW", "freq": 14200000, "comment": "first", "time_iso": now.isoformat()},
-            {"dx_call": "W1AW", "band": "20m", "mode": "CW", "freq": 14205000, "comment": "second", "time_iso": now.isoformat()},
+            {"dx_call": "W1AW", "band": "20m", "mode": "CW", "freq": 14200400, "comment": "second", "time_iso": now.isoformat()},
         ]
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -674,7 +674,7 @@ class TestPotaFetcher:
                 "comments": "40m", "locationDesc": "US-NJ",
             },
             {
-                "spotTime": now.isoformat(), "activator": "W2QMI", "frequency": "14290.0",
+                "spotTime": now.isoformat(), "activator": "W2QMI", "frequency": "14286.4",
                 "mode": "SSB", "reference": "US-6544", "spotter": "C",
                 "comments": "dup 20m", "locationDesc": "US-NJ",
             },
@@ -737,7 +737,7 @@ class TestHamQTHFetcher:
         assert s.callsign == "W1AW"
         assert s.spotter == "K1AR"
         assert s.frequency == pytest.approx(14.074)
-        assert s.band == "20M"
+        assert s.band == "20m"
         assert s.dx_country == "United States"
         assert s.dxcc == "291"
         assert s.comment == "CQ DX"
@@ -861,7 +861,7 @@ class TestDXSummitEdgeCases:
     async def test_duplicate_same_band_mode_keeps_first(self, fetcher, mock_session):
         csv_content = self._csv([
             "1,A,W1AW,CW first,14200,2024-01-15T12:00:00,United States,0,0,0,0",
-            "2,B,W1AW,CW second,14205,2024-01-15T12:00:00,United States,0,0,0,0",
+            "2,B,W1AW,CW second,14200.4,2024-01-15T12:00:00,United States,0,0,0,0",
         ])
         _mock_get(mock_session, csv_content)
         stations = await fetcher.fetch()
@@ -922,3 +922,11 @@ class TestDXSummitEdgeCases:
         _mock_get(mock_session, csv_content)
         stations = await fetcher.fetch()
         assert stations[0].spotter == "K1AR"
+
+    @pytest.mark.asyncio
+    async def test_requests_hf_json(self, fetcher, mock_session):
+        _mock_get(mock_session, "[]")
+        await fetcher.fetch()
+        url = mock_session.get.call_args[0][0]
+        assert "include=HF" in url
+        assert "limit=250" in url

@@ -4,6 +4,7 @@ from typing import List
 from datetime import datetime, timezone
 
 from .base import BaseFetcher
+from ..bands import canonical_band, mode_from_text
 from ..models import DXStation
 
 logger = logging.getLogger(__name__)
@@ -62,9 +63,9 @@ class HamQTHFetcher(BaseFetcher):
                     dxcc=adif if adif else "",
                     spotter_country="",
                     spotter=spotter,
-                    band=band,
+                    band=canonical_band(band),
                     frequency=float(frequency_str) / 1000.0 if frequency_str else None,
-                    mode="",
+                    mode=mode_from_text(comment),
                     comment=comment,
                     last_update=last_update,
                     source=self.name

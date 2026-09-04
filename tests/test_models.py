@@ -140,21 +140,21 @@ class TestDXStation:
 
 
 class TestSpotIdentity:
-    def test_same_call_band_mode_share_key(self):
-        assert live_spot_key("vp6g", "20m", "cw", 14.023) == live_spot_key("VP6G", "20M", "CW", 14.090)
+    def test_same_khz_shares_key_even_if_mode_differs(self):
+        assert live_spot_key("vp6g", "20m", "cw", 14.023) == live_spot_key("VP6G", "20M", "", 14.0234)
 
-    def test_different_bands_have_distinct_keys(self):
+    def test_different_frequencies_have_distinct_keys(self):
         assert live_spot_key("VP6G", "20m", "CW", 14.023) != live_spot_key("VP6G", "40m", "CW", 7.003)
 
     def test_cw_and_ft8_on_same_band_are_distinct(self):
         assert live_spot_key("VP6G", "20m", "CW", 14.023) != live_spot_key("VP6G", "20m", "FT8", 14.074)
 
-    def test_unmoded_spots_include_rounded_frequency(self):
+    def test_unmoded_spots_round_to_1_khz(self):
         assert live_spot_key("W1AW", "20m", "", 14.023) != live_spot_key("W1AW", "20m", "", 14.074)
         assert live_spot_key("W1AW", "20m", "", 14.0234) == live_spot_key("W1AW", "20m", "", 14.0231)
 
     def test_potential_identity_is_callsign_only(self):
-        live = DXStation(callsign="VP6G", source="DX Summit", band="20m", mode="CW")
+        live = DXStation(callsign="VP6G", source="DX Summit", band="20m", mode="CW", frequency=14.023)
         potential = DXStation(callsign="VP6G", source="NG3K", potential=True, band="160-10m")
         assert station_identity(live)[0] == "live"
         assert station_identity(potential) == ("potential", "VP6G")
