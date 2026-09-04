@@ -310,8 +310,8 @@ class TestDXClusterFetcher:
         import json
         now = datetime.now(timezone.utc)
         spots = [
-            {"dx_call": "W1AW", "band": "20m", "freq": 14200000, "comment": "first", "time_iso": now.isoformat()},
-            {"dx_call": "W1AW", "band": "40m", "freq": 7074000, "comment": "second", "time_iso": now.isoformat()},
+            {"dx_call": "W1AW", "band": "20m", "mode": "CW", "freq": 14200000, "comment": "first", "time_iso": now.isoformat()},
+            {"dx_call": "W1AW", "band": "20m", "mode": "CW", "freq": 14200400, "comment": "second", "time_iso": now.isoformat()},
         ]
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -322,6 +322,26 @@ class TestDXClusterFetcher:
         assert len(stations) == 1
         assert stations[0].band == "20m"
         assert stations[0].comment == "first"
+
+    @pytest.mark.asyncio
+    async def test_fetch_keeps_multiple_bands_and_modes(self, fetcher, mock_session):
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [
+            {"dx_call": "VP6G", "band": "20m", "mode": "CW", "freq": 14023000, "comment": "cw", "time_iso": now.isoformat()},
+            {"dx_call": "VP6G", "band": "20m", "mode": "FT8", "freq": 14074000, "comment": "ft8", "time_iso": now.isoformat()},
+            {"dx_call": "VP6G", "band": "40m", "mode": "CW", "freq": 7003000, "comment": "40cw", "time_iso": now.isoformat()},
+        ]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        stations = await fetcher.fetch()
+        keys = {(s.band, s.mode) for s in stations}
+        assert keys == {("20m", "CW"), ("20m", "FT8"), ("40m", "CW")}
+        assert all(s.callsign == "VP6G" for s in stations)
+
 
     @pytest.mark.asyncio
     async def test_fetch_converts_hz_to_mhz(self, fetcher, mock_session):
@@ -639,6 +659,38 @@ class TestPotaFetcher:
         assert stations[0].comment == "S59"
 
     @pytest.mark.asyncio
+    async def test_fetch_keeps_multiple_frequencies_for_same_activator(self, fetcher, mock_session):
+        import json
+        now = datetime.now(timezone.utc)
+        spots = [
+            {
+                "spotTime": now.isoformat(), "activator": "W2QMI", "frequency": "14286.0",
+                "mode": "SSB", "reference": "US-6544", "spotter": "A",
+                "comments": "20m", "locationDesc": "US-NJ",
+            },
+            {
+                "spotTime": now.isoformat(), "activator": "W2QMI", "frequency": "7180.0",
+                "mode": "SSB", "reference": "US-6544", "spotter": "B",
+                "comments": "40m", "locationDesc": "US-NJ",
+            },
+            {
+                "spotTime": now.isoformat(), "activator": "W2QMI", "frequency": "14286.4",
+                "mode": "SSB", "reference": "US-6544", "spotter": "C",
+                "comments": "dup 20m", "locationDesc": "US-NJ",
+            },
+        ]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(return_value=json.dumps(spots))
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+        stations = await fetcher.fetch()
+        freqs = sorted(s.frequency for s in stations)
+        assert freqs == pytest.approx([7.180, 14.286])
+        assert all(s.callsign == "W2QMI" for s in stations)
+
+
+    @pytest.mark.asyncio
     async def test_fetch_all_data_disabled_sources(self, mocker):
         mocker.patch('src.data_fetchers.Config.DATA_SOURCES', {
             "dx_summit": {"enabled": False},
@@ -685,7 +737,7 @@ class TestHamQTHFetcher:
         assert s.callsign == "W1AW"
         assert s.spotter == "K1AR"
         assert s.frequency == pytest.approx(14.074)
-        assert s.band == "20M"
+        assert s.band == "20m"
         assert s.dx_country == "United States"
         assert s.dxcc == "291"
         assert s.comment == "CQ DX"
@@ -806,17 +858,55 @@ class TestDXSummitEdgeCases:
         assert stations == []
 
     @pytest.mark.asyncio
-    async def test_duplicate_keeps_first(self, fetcher, mock_session):
+    async def test_duplicate_same_band_mode_keeps_first(self, fetcher, mock_session):
         csv_content = self._csv([
-            "1,A,W1AW,first,14200,2024-01-15T12:00:00,United States,0,0,0,0",
-            "2,B,W1AW,second,7100,2024-01-15T12:00:00,United States,0,0,0,0",
+            "1,A,W1AW,CW first,14200,2024-01-15T12:00:00,United States,0,0,0,0",
+            "2,B,W1AW,CW second,14200.4,2024-01-15T12:00:00,United States,0,0,0,0",
         ])
         _mock_get(mock_session, csv_content)
         stations = await fetcher.fetch()
         assert len(stations) == 1
         assert stations[0].band == "20m"
-        assert stations[0].comment == "first"
+        assert stations[0].comment == "CW first"
         assert stations[0].spotter == "A"
+
+    @pytest.mark.asyncio
+    async def test_keeps_multiple_bands_for_same_callsign(self, fetcher, mock_session):
+        csv_content = self._csv([
+            "1,A,VP6G,CW,14023,2024-01-15T12:00:00,Pitcairn,0,0,0,0",
+            "2,B,VP6G,FT8,14074,2024-01-15T12:00:00,Pitcairn,0,0,0,0",
+            "3,C,VP6G,CW,7003,2024-01-15T12:00:00,Pitcairn,0,0,0,0",
+        ])
+        _mock_get(mock_session, csv_content)
+        stations = await fetcher.fetch()
+        keys = {(s.band, s.mode) for s in stations}
+        assert keys == {("20m", "CW"), ("20m", "FT8"), ("40m", "CW")}
+        assert all(s.callsign == "VP6G" for s in stations)
+
+    @pytest.mark.asyncio
+    async def test_parses_json_spots(self, fetcher, mock_session):
+        import json
+        body = json.dumps([
+            {
+                "id": 1,
+                "de_call": "K1AR",
+                "dx_call": "VP6G",
+                "info": "FT8 loud",
+                "frequency": 14074.0,
+                "time": "2024-01-15T12:00:00",
+                "dx_country": "Pitcairn",
+            }
+        ])
+        _mock_get(mock_session, body)
+        stations = await fetcher.fetch()
+        assert len(stations) == 1
+        assert stations[0].callsign == "VP6G"
+        assert stations[0].mode == "FT8"
+        assert stations[0].band == "20m"
+        assert stations[0].frequency == pytest.approx(14.074)
+        assert stations[0].spotter == "K1AR"
+        assert stations[0].source == "DX Summit"
+
 
     def test_parse_spots_csv_reads_headers(self, fetcher):
         rows = fetcher._parse_spots_csv("dx_call,frequency\nW1AW,14200\n")
@@ -832,3 +922,11 @@ class TestDXSummitEdgeCases:
         _mock_get(mock_session, csv_content)
         stations = await fetcher.fetch()
         assert stations[0].spotter == "K1AR"
+
+    @pytest.mark.asyncio
+    async def test_requests_hf_json(self, fetcher, mock_session):
+        _mock_get(mock_session, "[]")
+        await fetcher.fetch()
+        url = mock_session.get.call_args[0][0]
+        assert "include=HF" in url
+        assert "limit=250" in url

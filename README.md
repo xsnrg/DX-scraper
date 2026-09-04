@@ -8,7 +8,7 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 
 ## Features
 
-- **Multi-source aggregation** — DX Summit, Spothole (DX Cluster), HamQTH, POTA, and NG3K, with callsign deduplication
+- **Multi-source aggregation** — DX Summit, Spothole (DX Cluster), HamQTH, POTA, and NG3K. Live spots are kept per callsign + band + mode so a DXpedition running several stations appears as several rows; duplicate reports of the same station are still merged
 - **Potential spots** — NG3K announced DXpeditions that are scheduled to be QRV *today* appear as rows with a yellow `potential` marker and `not spotted` in Updated. Live spots always win; QRZ / Wanted / search still apply; spot-age does not hide them
 - **Real-time dashboard** — Vue 3 + Tailwind UI with auto-refresh, sortable columns, and pagination
 - **QRZ logbook** — Import your QRZ.com log to hide confirmed QSOs and highlight needed DXCC. Token lives in the OS keyring, not on disk
@@ -24,7 +24,7 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 
 | Key | Display name | What it contributes |
 |-----|--------------|---------------------|
-| `dx_summit` | DX Summit | Live cluster spots (CSV) |
+| `dx_summit` | DX Summit | Live cluster spots from [dxsummit.fi](http://www.dxsummit.fi/); multiple concurrent stations per callsign |
 | `dx_cluster` | Spothole | Live cluster spots |
 | `hamqth` | HamQTH | Live spots |
 | `pota` | POTA | Park activations |

@@ -1,5 +1,5 @@
 import pytest
-from src.bands import frequency_to_band, band_to_range, BAND_RANGES
+from src.bands import frequency_to_band, band_to_range, BAND_RANGES, canonical_band, mode_from_text
 
 
 class TestBandRanges:
@@ -120,3 +120,22 @@ class TestFrequencyToBand:
     def test_zero_and_negative_frequency(self):
         assert frequency_to_band(0) is None
         assert frequency_to_band(-14.074) is None
+
+
+class TestCanonicalBandAndMode:
+    def test_canonical_band_hamqth_uppercase(self):
+        assert canonical_band("20M") == "20m"
+        assert canonical_band("70CM") == "70cm"
+        assert canonical_band(" 40m ") == "40m"
+
+    def test_canonical_band_empty(self):
+        assert canonical_band("") == ""
+        assert canonical_band(None) == ""
+
+    def test_band_to_range_accepts_uppercase(self):
+        assert band_to_range("20M") == (14.000, 14.350)
+
+    def test_mode_from_text(self):
+        assert mode_from_text("Calling CQ FT8 -6") == "FT8"
+        assert mode_from_text("CW JN55xm") == "CW"
+        assert mode_from_text("tnx 73") == ""

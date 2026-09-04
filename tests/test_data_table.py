@@ -43,6 +43,26 @@ def test_data_table_source_badges(page: Page):
     expect(page.get_by_text("DX Cluster").first).to_be_visible()
 
 
+def test_data_table_multiple_spots_same_callsign(page: Page):
+    """A DXpedition callsign can appear on more than one band/mode at once."""
+    mock = _mock_data(num_stations=2)
+    extra = dict(mock["stations"][0])
+    extra["band"] = "20m"
+    extra["frequency"] = 14.023
+    extra["mode"] = "CW"
+    extra["comment"] = "20m station"
+    mock["stations"].append(extra)
+    mock["total_stations"] = len(mock["stations"])
+    mock["active_stations"] = len(mock["stations"])
+    open_dashboard(page, mock)
+    rows = page.locator("tr").filter(has_text="W1AW")
+    expect(rows).to_have_count(2)
+    expect(rows.filter(has_text="40m")).to_be_visible()
+    expect(rows.filter(has_text="20m")).to_be_visible()
+    expect(rows.filter(has_text="CW")).to_be_visible()
+    expect(rows.filter(has_text="SSB")).to_be_visible()
+
+
 def test_data_table_empty_state(page: Page):
     """Table shows empty state message when no stations match."""
     open_dashboard(page, _mock_data(num_stations=0))
