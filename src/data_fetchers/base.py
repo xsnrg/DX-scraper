@@ -2,10 +2,11 @@ import asyncio
 import aiohttp
 import logging
 from typing import Optional, Dict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from ..config import Config
 from ..exceptions import DataSourceError, DataStalenessException
+from ..timeutil import as_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,8 @@ class BaseFetcher:
 
     def validate_age(self, last_update: datetime) -> bool:
         max_age = timedelta(seconds=Config.DATA_MAX_AGE_SECONDS)
-        if last_update.tzinfo is None:
-            last_update = last_update.replace(tzinfo=timezone.utc)
-        age = datetime.now(timezone.utc) - last_update
+        last_update = as_utc(last_update)
+        age = utc_now() - last_update
         if age > max_age:
             return False
         return True
@@ -46,4 +46,3 @@ class BaseFetcher:
     def validate_all_stations(self, stations: list) -> None:
         if not stations:
             raise DataStalenessException(Config.DATA_MAX_AGE_SECONDS, 0)
-
