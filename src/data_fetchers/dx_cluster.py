@@ -1,10 +1,10 @@
 import aiohttp
 import logging
 from typing import List, Dict, Any
-from datetime import datetime, timezone
 
 from .base import BaseFetcher
 from ..models import DXStation, live_spot_key
+from ..timeutil import parse_utc
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,7 @@ class DXClusterFetcher(BaseFetcher):
                 else:
                     frequency = None
                 
-                try:
-                    time_iso = spot.get("time_iso", "")
-                    last_update = datetime.fromisoformat(time_iso)
-                except (ValueError, AttributeError):
-                    last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
+                last_update = parse_utc(spot.get("time_iso", ""), fallback_now=True)
                 
                 if not self.validate_age(last_update):
                     continue

@@ -1,11 +1,11 @@
 import aiohttp
 import logging
 from typing import List, Dict, Any
-from datetime import datetime, timezone
 
 from .base import BaseFetcher
 from ..bands import frequency_to_band
 from ..models import DXStation, live_spot_key
+from ..timeutil import parse_utc
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +46,7 @@ class PotaFetcher(BaseFetcher):
                 else:
                     frequency = None
 
-                try:
-                    spot_time = spot.get("spotTime", "")
-                    last_update = datetime.fromisoformat(spot_time)
-                    if last_update.tzinfo is None:
-                        last_update = last_update.replace(tzinfo=timezone.utc)
-                except (ValueError, AttributeError):
-                    last_update = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
+                last_update = parse_utc(spot.get("spotTime", ""), fallback_now=True)
 
                 if not self.validate_age(last_update):
                     continue

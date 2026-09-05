@@ -1,11 +1,11 @@
 import aiohttp
 import logging
 from typing import List
-from datetime import datetime, timezone
 
 from .base import BaseFetcher
 from ..bands import canonical_band, mode_from_text
 from ..models import DXStation
+from ..timeutil import parse_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +50,12 @@ class HamQTHFetcher(BaseFetcher):
                     if len(dt_parts) == 2:
                         time_str, date_str = dt_parts
                         formatted_dt = f"{date_str} {time_str[:2]}:{time_str[2:]}"
-                        last_update = datetime.strptime(formatted_dt, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
+                        last_update = parse_utc(formatted_dt, fallback_now=False)
                     else:
-                        last_update = datetime.now(timezone.utc)
+                        last_update = utc_now()
                 except Exception as e:
                     logger.debug(f"Could not parse date {date_time_str}: {e}")
-                    last_update = datetime.now(timezone.utc)
+                    last_update = utc_now()
 
                 stations.append(DXStation(
                     callsign=callsign,

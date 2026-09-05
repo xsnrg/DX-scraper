@@ -1,6 +1,6 @@
 import logging
 import aiohttp
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from .models import DXStation, DXDataSummary, station_identity
@@ -8,6 +8,7 @@ from .data_fetchers import fetch_all_data
 from .exceptions import DataStalenessException
 from .bands import frequency_to_band, canonical_band, mode_from_text
 from .dxcc import resolve_dxcc
+from .timeutil import as_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class DXPeditionService:
         self.excluded_sources = excluded_sources or []
 
     def filter_by_age(self, stations: List[DXStation]) -> List[DXStation]:
-        cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=self.max_age_seconds)
+        cutoff_time = utc_now() - timedelta(seconds=self.max_age_seconds)
         filtered = [
             s for s in stations
             if s.potential or self._normalize_datetime(s.last_update) >= cutoff_time
@@ -108,7 +109,7 @@ class DXPeditionService:
         return stations
 
     def _normalize_datetime(self, dt: datetime) -> datetime:
-        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+        return as_utc(dt)
 
     def get_active_bands(self, stations: List[DXStation]) -> List[DXStation]:
         active = [s for s in stations if s.status == "active"]
@@ -134,7 +135,7 @@ class DXPeditionService:
             return DXDataSummary(
                 total_stations=len(stations),
                 active_stations=len([s for s in stations if s.status == "active"]),
-                last_refresh=datetime.now(timezone.utc).replace(tzinfo=timezone.utc),
+                last_refresh=utc_now(),
                 data_sources=sources,
                 stations=stations
             )

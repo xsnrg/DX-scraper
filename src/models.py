@@ -1,8 +1,9 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 
 from .bands import canonical_band
+from .timeutil import utc_now
 
 
 def live_spot_key(
@@ -57,7 +58,7 @@ class DXStation(BaseModel):
     frequency: Optional[float] = None
     mode: str = ""
     comment: str = ""
-    last_update: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
+    last_update: datetime = Field(default_factory=utc_now)
     source: str
     sources: list[str] = []
     pota_reference: str = ""
@@ -77,6 +78,6 @@ class DXDataSummary(BaseModel):
 
     total_stations: int
     active_stations: int
-    last_refresh: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=timezone.utc))
+    last_refresh: datetime = Field(default_factory=utc_now)
     data_sources: list[str]
     stations: list[DXStation]

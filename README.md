@@ -113,6 +113,18 @@ pytest tests/test_ng3k.py -v
 | `GET` | `/qrz-qso-data` | Full cached QSO records |
 | `GET` | `/dxcc-map.html` | DXCC QSL status map |
 
+## Time
+
+All timestamps stored and compared by the application are UTC:
+
+- Spot `last_update` and summary `last_refresh` are timezone-aware UTC datetimes
+- Cluster, POTA, HamQTH, and DX Summit feeds that omit an offset are interpreted as UTC
+- Offsets in other zones are converted to UTC before comparison or display
+- NG3K “today” uses the UTC calendar date
+- QRZ cache `last_modified` is formatted from file mtime as UTC
+- CLI JSON uses ISO-8601 with a `Z` suffix; table output is labeled UTC
+- Docker images set `TZ=UTC`
+
 ## Configuration
 
 | Variable | Default | Description |

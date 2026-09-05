@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import List, Optional
 
 import aiohttp
@@ -16,6 +16,7 @@ import aiohttp
 from .base import BaseFetcher
 from ..dxcc import DXCC_LOOKUP
 from ..models import DXStation
+from ..timeutil import utc_now, utc_today
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +175,7 @@ def _canonical_country(place: str) -> str:
 
 def parse_dxcal_ics(text: str, today: Optional[date] = None) -> List[DXStation]:
     """Parse the NG3K iCal feed into potential spots for operations QRV today."""
-    today = today or datetime.now(timezone.utc).date()
+    today = today or utc_today()
     events: list[dict] = []
     current: dict[str, str] = {}
     for line in _unfold(text):
@@ -188,7 +189,7 @@ def parse_dxcal_ics(text: str, today: Optional[date] = None) -> List[DXStation]:
             key, value = line.split(":", 1)
             current[key.split(";")[0]] = value
 
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     stations: list[DXStation] = []
     seen: set[str] = set()
     for event in events:

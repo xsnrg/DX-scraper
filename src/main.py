@@ -3,8 +3,8 @@ import json
 import logging
 import argparse
 import sys
-from datetime import datetime
 from typing import Optional
+import time
 
 from src.models import DXDataSummary
 from src.service import DXPeditionService
@@ -12,10 +12,12 @@ from src.config import Config
 from src.exceptions import QRZDataError
 from src.qrz_qso import sync_qso_data, LOG_FILE, _authenticate
 from src.qrz_config import get_qrz_data, save_qrz_data, QRZConfigError
+from src.timeutil import format_iso_utc, format_utc
 
+logging.Formatter.converter = time.gmtime
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s UTC - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
             output = {
                 "total_stations": summary.total_stations,
                 "active_stations": summary.active_stations,
-                "last_refresh": summary.last_refresh.isoformat(),
+                "last_refresh": format_iso_utc(summary.last_refresh),
                 "data_sources": summary.data_sources,
                 "stations": [
                     {
@@ -69,7 +71,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
                         "frequency": s.frequency,
                         "mode": s.mode,
                         "comment": s.comment,
-                        "last_update": s.last_update.isoformat(),
+                        "last_update": format_iso_utc(s.last_update),
                         "source": s.source,
                         "sources": s.sources,
                         "pota_reference": s.pota_reference,
@@ -86,7 +88,7 @@ async def main(max_age_seconds: Optional[int] = None, output_format: str = "json
                 freq_str = f"{station.frequency:.4f}" if station.frequency else ""
                 mode_comment = f"{station.mode}" if station.mode else station.comment
                 sources_str = ", ".join(station.sources) if station.sources else station.source
-                print(f"{station.callsign:<10} {station.dx_country:<15} {station.spotter:<15} {station.band:<8} {freq_str:<12} {mode_comment:<30} {station.last_update.strftime('%Y-%m-%d %H:%M'):<20} {sources_str}")
+                print(f"{station.callsign:<10} {station.dx_country:<15} {station.spotter:<15} {station.band:<8} {freq_str:<12} {mode_comment:<30} {format_utc(station.last_update, timespec='minutes'):<20} {sources_str}")
         else:
             print(f"Unknown format: {output_format}")
         
@@ -199,4 +201,3 @@ async def _debug_qrz():
 
 if __name__ == "__main__":
     asyncio.run(main_entry())
-
