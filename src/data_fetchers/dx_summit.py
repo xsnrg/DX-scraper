@@ -2,7 +2,7 @@ import csv
 import io
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, Any, List
 from urllib.parse import urlencode
 
@@ -11,18 +11,13 @@ import aiohttp
 from .base import BaseFetcher
 from ..bands import frequency_to_band, mode_from_text
 from ..models import DXStation, live_spot_key
+from ..timeutil import parse_utc
 
 logger = logging.getLogger(__name__)
 
 
 def _parse_time(raw: str) -> datetime:
-    try:
-        last_update = datetime.fromisoformat((raw or "").replace("Z", "+00:00"))
-        if last_update.tzinfo is None:
-            last_update = last_update.replace(tzinfo=timezone.utc)
-        return last_update
-    except (ValueError, AttributeError, TypeError):
-        return datetime.now(timezone.utc)
+    return parse_utc(raw, fallback_now=True)
 
 
 class DXSummitFetcher(BaseFetcher):
