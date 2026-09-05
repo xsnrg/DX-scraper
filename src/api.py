@@ -7,6 +7,7 @@ from .qrz_config import save_qrz_data, get_qrz_data, QRZConfigError
 from .exceptions import QRZDataError
 from .qrz_qso import sync_qso_data, QSO_CACHE_FILE, _authenticate
 from .bands import frequency_to_band
+from .timeutil import format_mtime_utc
 import asyncio
 import os
 
@@ -83,7 +84,6 @@ async def qrz_sync():
 async def qrz_cache():
     import json
     import os
-    import time
     if not QSO_CACHE_FILE.exists():
         return {"data": [], "exists": False, "count": 0, "last_modified": ""}
     stat = QSO_CACHE_FILE.stat()
@@ -107,7 +107,7 @@ async def qrz_cache():
                 pairs.append([call.upper(), band, dxcc])
         except (json.JSONDecodeError, TypeError):
             pass
-    last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+    last_modified = format_mtime_utc(stat.st_mtime)
     return {"data": pairs, "exists": True, "count": len(pairs), "last_modified": last_modified}
 
 
@@ -115,7 +115,6 @@ async def qrz_cache():
 async def qrz_dxcc_numbers():
     """Return unique DXCC numbers from confirmed QSOs for the Wanted filter."""
     import json
-    import time
     if not QSO_CACHE_FILE.exists():
         return {"data": [], "exists": False, "count": 0, "last_modified": ""}
     stat = QSO_CACHE_FILE.stat()
@@ -132,14 +131,13 @@ async def qrz_dxcc_numbers():
                     dxcc_set.add(dxcc)
         except (json.JSONDecodeError, TypeError):
             pass
-    last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+    last_modified = format_mtime_utc(stat.st_mtime)
     return {"data": sorted(dxcc_set, key=lambda x: int(x)), "exists": True, "count": len(dxcc_set), "last_modified": last_modified}
 
 
 @app.get("/qrz-all-data")
 async def qrz_all_data():
     import json
-    import time
     if not QSO_CACHE_FILE.exists():
         return {"data": [], "exists": False, "count": 0, "last_modified": ""}
     stat = QSO_CACHE_FILE.stat()
@@ -163,7 +161,7 @@ async def qrz_all_data():
                 entries.append([call.upper(), band, status])
         except (json.JSONDecodeError, TypeError):
             pass
-    last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+    last_modified = format_mtime_utc(stat.st_mtime)
     return {"data": entries, "exists": True, "count": len(entries), "last_modified": last_modified}
 
 
