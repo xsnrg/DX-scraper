@@ -1,0 +1,126 @@
+diff --git a/src/web/index.html b/src/web/index.html
+index ef7dc79..35490e9 100644
+--- a/src/web/index.html
++++ b/src/web/index.html
+@@ -11,10 +11,54 @@
+         [v-cloak] { display: none; }
+         .sort-asc::after { content: ' \2191'; }
+         .sort-desc::after { content: ' \2193'; }
++        .tz-slider {
++            width: 2.75rem;
++            height: 1.5rem;
++            appearance: none;
++            -webkit-appearance: none;
++            background: #334155;
++            border-radius: 9999px;
++            position: relative;
++            cursor: pointer;
++            outline: none;
++        }
++        .tz-slider::-webkit-slider-thumb {
++            -webkit-appearance: none;
++            appearance: none;
++            width: 1.15rem;
++            height: 1.15rem;
++            border-radius: 9999px;
++            background: #e2e8f0;
++            border: 0;
++            margin-top: 0;
++        }
++        .tz-slider::-moz-range-thumb {
++            width: 1.15rem;
++            height: 1.15rem;
++            border-radius: 9999px;
++            background: #e2e8f0;
++            border: 0;
++        }
++        .tz-slider.utc-on {
++            background: #2563eb;
++        }
+     </style>
+ </head>
+ <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+     <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
++        <!-- Timezone display toggle -->
++        <div class="mb-4 flex items-center justify-end gap-3 text-sm text-slate-300" id="tz-toggle-bar">
++            <span :class="displayUtc ? 'text-slate-500' : 'text-slate-100 font-semibold'">Local</span>
++            <input type="range" min="0" max="1" step="1"
++                   class="tz-slider"
++                   :class="{ 'utc-on': displayUtc }"
++                   :value="displayUtc ? 1 : 0"
++                   @input="setDisplayUtc($event.target.value === '1')"
++                   aria-label="Toggle between local browser time and UTC"
++                   id="tz-slider">
++            <span :class="displayUtc ? 'text-blue-300 font-semibold' : 'text-slate-500'">UTC</span>
++        </div>
++
+         <!-- Header Section -->
+         <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+             <div>
+@@ -41,7 +85,7 @@
+                         <i class="fas" :class="syncStatus === 'syncing' ? 'fa-spinner fa-spin' : qrzReady ? 'fa-key' : 'fa-plug'"></i>
+                         {{ syncStatus === 'syncing' ? 'Syncing QRZ...' : syncStatus === 'success' ? 'Synced!' : syncStatus === 'error' ? 'Sync Failed' : qrzReady ? 'Refresh QRZ Data' : 'Setup QRZ' }}
+                     </button>
+-                    <div class="text-xs text-slate-500 mt-1">{{ qrzCacheInfo.last_modified || '' }}</div>
++                    <div class="text-xs text-slate-500 mt-1">{{ formatDate(qrzCacheInfo.last_modified) === 'N/A' ? '' : formatDate(qrzCacheInfo.last_modified) }}</div>
+                 </div>
+                 <div class="flex flex-col items-center">
+                     <button @click="toggleQrzFilter"
+@@ -301,6 +345,12 @@
+                 const qrzAllBands = ref(new Map());
+                 const qrzConfirmedDxccNumbers = ref(new Set());
+                 const wantedMode = ref(parseInt(localStorage.getItem('wantedMode') || '0'));
++                const displayUtc = ref(localStorage.getItem('displayUtc') !== 'false');
++
++                const setDisplayUtc = (enabled) => {
++                    displayUtc.value = !!enabled;
++                    localStorage.setItem('displayUtc', displayUtc.value.toString());
++                };
+ 
+                 const loadQrzCache = async () => {
+                     try {
+@@ -539,7 +589,18 @@
+                 const formatDate = (dateStr) => {
+                     if (!dateStr) return 'N/A';
+                     const date = new Date(dateStr);
+-                    return date.toLocaleString(undefined, { hour12: false });
++                    if (Number.isNaN(date.getTime())) {
++                        const asUtc = Date.parse(String(dateStr).replace(' UTC', 'Z').replace(' ', 'T'));
++                        if (Number.isNaN(asUtc)) return dateStr;
++                        return formatDate(new Date(asUtc).toISOString());
++                    }
++                    const opts = { hour12: false };
++                    if (displayUtc.value) {
++                        opts.timeZone = 'UTC';
++                        return date.toLocaleString(undefined, opts) + ' UTC';
++                    }
++                    return date.toLocaleString(undefined, opts);
+                 };
+ 
+                 const countdownText = ref('5:00');
+@@ -621,7 +682,7 @@
+                         const syncData = await syncResp.json();
+                         if (syncData.status === 'ok') {
+                             syncStatus.value = 'success';
+-                            qrzCacheInfo.value.last_modified = new Date().toLocaleString(undefined, { hour12: false });
++                            qrzCacheInfo.value.last_modified = new Date().toISOString();
+                             clearTimeout(syncTimeout);
+                             syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
+                         } else {
+@@ -648,7 +709,7 @@
+                         if (data.status === 'ok') {
+                             syncStatus.value = 'success';
+                             await loadQrzCache();
+-                            qrzCacheInfo.value.last_modified = new Date().toLocaleString(undefined, { hour12: false });
++                            qrzCacheInfo.value.last_modified = new Date().toISOString();
+                             clearTimeout(syncTimeout);
+                             syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
+                         } else if (data.needs_renewal) {
+@@ -681,6 +742,7 @@
+                     qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
+                     getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
+                     wantedMode, toggleWanted,
++                    displayUtc, setDisplayUtc,
+                 };
+             }
+         }).mount('#app');
