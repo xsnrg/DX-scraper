@@ -231,11 +231,15 @@
                             <td class="px-6 py-4 text-sm text-slate-400">{{ station.potential ? 'not spotted' : formatDate(station.last_update) }}</td>
                             <td class="px-3 py-4 align-middle whitespace-nowrap">
                                 <div class="inline-flex items-center gap-1" :title="(station.sources && station.sources.length ? station.sources : [station.source]).join(', ')">
-                                    <span v-for="src in (station.sources && station.sources.length ? station.sources : [station.source])"
+                                    <a v-for="src in (station.sources && station.sources.length ? station.sources : [station.source])"
                                           :key="src"
-                                          class="text-[10px] leading-none bg-blue-900/50 text-blue-300 px-1.5 py-0.5 rounded-full border border-blue-700/50">
+                                          :href="sourceUrl(src, station.callsign)"
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          :title="`Open ${src} for ${station.callsign}`"
+                                          class="text-[10px] leading-none bg-blue-900/50 text-blue-300 px-1.5 py-0.5 rounded-full border border-blue-700/50 hover:bg-blue-700/70 hover:text-white transition-colors">
                                         {{ src }}
-                                    </span>
+                                    </a>
                                 </div>
                             </td>
                         </tr>
@@ -481,6 +485,22 @@
                     { key: 'last_update', label: 'Updated' },
                     { key: 'source', label: 'Source', width: '220px' },
                 ];
+
+                const SOURCE_LOOKUP = {
+                    'DX Summit': (call) => `http://www.dxsummit.fi/#/?dx_calls=${encodeURIComponent(call)}`,
+                    'Spothole': (call) => `https://spothole.app/?text_includes=${encodeURIComponent(call)}`,
+                    'DX Cluster': (call) => `https://spothole.app/?text_includes=${encodeURIComponent(call)}`,
+                    'HamQTH': (call) => `https://www.hamqth.com/${encodeURIComponent(call)}`,
+                    'POTA': (call) => `https://pota.app/#/profile/${encodeURIComponent(call)}`,
+                    'NG3K': (call) => `https://www.ng3k.com/cgi-bin/adxo.pl?query=${encodeURIComponent(call)}`,
+                };
+
+                const sourceUrl = (src, callsign) => {
+                    if (!src || !callsign) return '#';
+                    const build = SOURCE_LOOKUP[src];
+                    if (build) return build(callsign);
+                    return '#';
+                };
 
                 const fetchData = async () => {
                     loading.value = true;
@@ -742,6 +762,7 @@
                     getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
                     wantedMode, toggleWanted,
                     displayUtc, setDisplayUtc,
+                    sourceUrl,
                 };
             }
         }).mount('#app');
