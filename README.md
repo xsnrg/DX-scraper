@@ -10,7 +10,7 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 
 - **Multi-source aggregation** — DX Summit, Spothole (DX Cluster), HamQTH, POTA, and NG3K. Live spots are kept per callsign + band + mode so a DXpedition running several stations appears as several rows; duplicate reports of the same station are still merged
 - **Potential spots** — NG3K announced DXpeditions that are scheduled to be QRV *today* appear as rows with a yellow `potential` marker and `not spotted` in Updated. Live spots always win; QRZ / Wanted / search still apply; spot-age does not hide them
-- **Real-time dashboard** — Vue 3 + Tailwind UI with auto-refresh, sortable columns, and pagination
+- **Real-time dashboard** — Vue 3 + Tailwind UI with auto-refresh, sortable columns, pagination, and a Local/UTC time slider
 - **QRZ logbook** — Import your QRZ.com log to hide confirmed QSOs and highlight needed DXCC. Token lives in the OS keyring, not on disk
 - **Wanted filter** — Three-way toggle: off → highlight needed DXCC in red → show only needed DXCC
 - **QRZ filter** — Hide callsigns already confirmed on that band
@@ -124,6 +124,7 @@ All timestamps stored and compared by the application are UTC:
 - QRZ cache `last_modified` is formatted from file mtime as UTC
 - CLI JSON uses ISO-8601 with a `Z` suffix; table output is labeled UTC
 - Docker images set `TZ=UTC`
+- The dashboard slider at the top of the page switches displayed times between UTC (default) and the browser's local timezone; the choice is stored in `localStorage` as `displayUtc`
 
 ## Configuration
 
