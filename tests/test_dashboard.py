@@ -122,7 +122,7 @@ def test_timezone_slider_defaults_to_utc(page: Page):
     """Times include a UTC suffix when the slider is in the default UTC position."""
     open_dashboard(page)
     expect(page.locator("#tz-slider")).to_have_value("1")
-    expect(page.locator("div.grid").first).to_contain_text("UTC")
+    expect(page.locator("#last-refresh-value")).to_contain_text("UTC")
 
 
 def test_timezone_slider_toggles_to_local_and_persists(page: Page):
@@ -130,10 +130,10 @@ def test_timezone_slider_toggles_to_local_and_persists(page: Page):
     open_dashboard(page)
     page.locator("#tz-slider").fill("0")
     expect(page.locator("#tz-slider")).to_have_value("0")
-    expect(page.locator("div.grid").first).not_to_contain_text("UTC")
+    expect(page.locator("#last-refresh-value")).not_to_contain_text("UTC")
     stored = page.evaluate("() => localStorage.getItem('displayUtc')")
     assert stored == "false"
 
     page.reload()
     expect(page.locator("#tz-slider")).to_have_value("0")
-    expect(page.locator("div.grid").first).not_to_contain_text("UTC")
+    expect(page.locator("#last-refresh-value")).not_to_contain_text("UTC")
