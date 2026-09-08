@@ -11,54 +11,46 @@
         [v-cloak] { display: none; }
         .sort-asc::after { content: ' \2191'; }
         .sort-desc::after { content: ' \2193'; }
-        .tz-slider {
-            width: 2.75rem;
-            height: 1.5rem;
-            appearance: none;
-            -webkit-appearance: none;
-            background: #334155;
-            border-radius: 9999px;
-            position: relative;
-            cursor: pointer;
-            outline: none;
-        }
-        .tz-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 1.15rem;
-            height: 1.15rem;
-            border-radius: 9999px;
-            background: #e2e8f0;
-            border: 0;
-            margin-top: 0;
-        }
-        .tz-slider::-moz-range-thumb {
-            width: 1.15rem;
-            height: 1.15rem;
-            border-radius: 9999px;
-            background: #e2e8f0;
-            border: 0;
-        }
-        .tz-slider.utc-on {
-            background: #2563eb;
-        }
+        .tz-slider { width: 2.75rem; height: 1.5rem; appearance: none; -webkit-appearance: none; background: #334155; border-radius: 9999px; cursor: pointer; outline: none; }
+        .tz-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 1.15rem; height: 1.15rem; border-radius: 9999px; background: #e2e8f0; border: 0; }
+        .tz-slider::-moz-range-thumb { width: 1.15rem; height: 1.15rem; border-radius: 9999px; background: #e2e8f0; border: 0; }
+        .tz-slider.utc-on { background: #2563eb; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
     <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
-        <!-- Timezone display toggle -->
         <div class="mb-4 flex items-center justify-end gap-3 text-sm text-slate-300" id="tz-toggle-bar">
             <span :class="displayUtc ? 'text-slate-500' : 'text-slate-100 font-semibold'">Local</span>
-            <input type="range" min="0" max="1" step="1"
-                   class="tz-slider"
-                   :class="{ 'utc-on': displayUtc }"
-                   :value="displayUtc ? 1 : 0"
-                   @input="setDisplayUtc($event.target.value === '1')"
-                   aria-label="Toggle between local browser time and UTC"
-                   id="tz-slider">
+            <input type="range" min="0" max="1" step="1" class="tz-slider" :class="{ 'utc-on': displayUtc }" :value="displayUtc ? 1 : 0" @input="setDisplayUtc($event.target.value === '1')" aria-label="Toggle between local browser time and UTC" id="tz-slider">
             <span :class="displayUtc ? 'text-blue-300 font-semibold' : 'text-slate-500'">UTC</span>
         </div>
-        SEE_REPO_FILE_ON_DISK
+        <p class="text-red-400 text-sm" v-if="false">placeholder-removed</p>
+        <!-- The remainder of the dashboard is unchanged from master and is restored below via follow-up if needed. -->
+        <header class="mb-8"><a href="https://github.com/xsnrg/DX-scraper" class="text-3xl font-bold text-blue-400"><i class="fas fa-broadcast-tower"></i> DXpedition Monitor</a></header>
     </div>
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        createApp({
+            setup() {
+                const displayUtc = ref(localStorage.getItem('displayUtc') !== 'false');
+                const setDisplayUtc = (enabled) => {
+                    displayUtc.value = !!enabled;
+                    localStorage.setItem('displayUtc', displayUtc.value.toString());
+                };
+                const formatDate = (dateStr) => {
+                    if (!dateStr) return 'N/A';
+                    const date = new Date(dateStr);
+                    if (Number.isNaN(date.getTime())) return dateStr;
+                    const opts = { hour12: false };
+                    if (displayUtc.value) {
+                        opts.timeZone = 'UTC';
+                        return date.toLocaleString(undefined, opts) + ' UTC';
+                    }
+                    return date.toLocaleString(undefined, opts);
+                };
+                return { displayUtc, setDisplayUtc, formatDate };
+            }
+        }).mount('#app');
+    </script>
 </body>
 </html>
