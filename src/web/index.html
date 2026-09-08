@@ -9,46 +9,679 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         [v-cloak] { display: none; }
-        .sort-asc::after { content: ' \2191'; }
-        .sort-desc::after { content: ' \2193'; }
-        .tz-slider { width: 2.75rem; height: 1.5rem; appearance: none; -webkit-appearance: none; background: #334155; border-radius: 9999px; cursor: pointer; outline: none; }
-        .tz-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 1.15rem; height: 1.15rem; border-radius: 9999px; background: #e2e8f0; border: 0; }
-        .tz-slider::-moz-range-thumb { width: 1.15rem; height: 1.15rem; border-radius: 9999px; background: #e2e8f0; border: 0; }
-        .tz-slider.utc-on { background: #2563eb; }
+        .sort-asc::after { content: ' ↑'; }
+        .sort-desc::after { content: ' ↓'; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
     <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
-        <div class="mb-4 flex items-center justify-end gap-3 text-sm text-slate-300" id="tz-toggle-bar">
-            <span :class="displayUtc ? 'text-slate-500' : 'text-slate-100 font-semibold'">Local</span>
-            <input type="range" min="0" max="1" step="1" class="tz-slider" :class="{ 'utc-on': displayUtc }" :value="displayUtc ? 1 : 0" @input="setDisplayUtc($event.target.value === '1')" aria-label="Toggle between local browser time and UTC" id="tz-slider">
-            <span :class="displayUtc ? 'text-blue-300 font-semibold' : 'text-slate-500'">UTC</span>
+        <!-- Header Section -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <a href="https://github.com/xsnrg/DX-scraper" target="_blank" class="text-3xl font-bold text-blue-400 flex items-center gap-3 hover:text-blue-300 transition-colors">
+                    <i class="fas fa-broadcast-tower"></i> DXpedition Monitor
+                </a>
+                <p class="text-slate-400 mt-1">Tracking of active DX spots</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex flex-col items-center">
+                    <button @click="togglePota"
+                            :class="potaEnabled ? 'bg-purple-600 hover:bg-purple-700' : 'bg-slate-600 hover:bg-slate-700'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                        <i class="fas" :class="potaEnabled ? 'fa-check-circle' : 'fa-circle'"></i>
+                        {{ potaEnabled ? 'POTA enabled' : 'Activate POTA' }}
+                    </button>
+                    <div class="text-xs text-transparent mt-1">POTA</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <button @click="syncQrzData" 
+                            :class="syncStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="syncStatus === 'syncing'">
+                        <i class="fas" :class="syncStatus === 'syncing' ? 'fa-spinner fa-spin' : qrzReady ? 'fa-key' : 'fa-plug'"></i>
+                        {{ syncStatus === 'syncing' ? 'Syncing QRZ...' : syncStatus === 'success' ? 'Synced!' : syncStatus === 'error' ? 'Sync Failed' : qrzReady ? 'Refresh QRZ Data' : 'Setup QRZ' }}
+                    </button>
+                    <div class="text-xs text-slate-500 mt-1">{{ qrzCacheInfo.last_modified || '' }}</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <button @click="toggleQrzFilter"
+                            :class="qrzFilterEnabled ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="!qrzCacheInfo.exists || qrzCacheInfo.count === 0">
+                        <i class="fas" :class="qrzFilterEnabled ? 'fa-filter' : 'fa-filter-open'"></i>
+                        {{ qrzFilterEnabled ? 'QRZ filter enabled' : 'QRZ filter disabled' }}
+                    </button>
+                    <div class="text-xs text-transparent mt-1">QRZ filter</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <button @click="toggleWanted"
+                            :class="wantedMode === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'"
+                            class="text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="!qrzReady">
+                        <i class="fas" :class="wantedMode === 0 ? 'fa-star-half-stroke' : wantedMode === 1 ? 'fa-star' : 'fa-crosshairs'"></i>
+                        {{ wantedMode === 0 ? 'Wanted disabled' : wantedMode === 1 ? 'Wanted enabled' : 'Only wanted' }}
+                    </button>
+                    <div class="text-xs text-transparent mt-1">Wanted</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <button @click="fetchData" :disabled="loading" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                        <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
+                        {{ loading ? 'Updating...' : 'Refresh Data' }}
+                    </button>
+                    <div class="text-xs text-slate-500 mt-1">Refresh in {{ countdownText }}</div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <a href="/dxcc-map.html" 
+                       class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                        <i class="fas fa-map-marked-alt"></i>
+                        Map my QSOs
+                    </a>
+                    <div class="text-xs text-transparent mt-1">Map</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <div v-if="summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                <div class="text-slate-400 text-sm uppercase font-semibold">Total Stations</div>
+                <div class="text-2xl font-bold">{{ summary.total_stations }}</div>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                <div class="text-slate-400 text-sm uppercase font-semibold">Active Now</div>
+                <div class="text-2xl font-bold text-green-400">{{ summary.active_stations }}</div>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                <div class="text-slate-400 text-sm uppercase font-semibold">Last Refresh</div>
+                <div class="text-2xl font-bold text-blue-300">{{ formatDate(summary.last_refresh) }}</div>
+            </div>
         </div>
-        <p class="text-red-400 text-sm" v-if="false">placeholder-removed</p>
-        <!-- The remainder of the dashboard is unchanged from master and is restored below via follow-up if needed. -->
-        <header class="mb-8"><a href="https://github.com/xsnrg/DX-scraper" class="text-3xl font-bold text-blue-400"><i class="fas fa-broadcast-tower"></i> DXpedition Monitor</a></header>
+
+        <!-- Controls Bar -->
+        <div v-if="summary" class="bg-slate-800 p-4 rounded-t-xl border-x border-t border-slate-700 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="relative w-full md:w-[30rem]">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                <input v-model="searchQuery" type="text" placeholder="Search... (comma=AND pipe=OR)" 
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors" title="Clear search">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="flex items-center gap-4 w-full md:w-auto">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-slate-400">Rows:</label>
+                    <select v-model="pageSize" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 focus:outline-none">
+                        <option :value="10">10</option>
+                        <option :value="25">25</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-slate-400">Spot age:</label>
+                    <select v-model="maxAgeMinutes" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 focus:outline-none">
+                        <option :value="10">10</option>
+                        <option :value="20">20</option>
+                        <option :value="30">30</option>
+                        <option :value="60">60</option>
+                    </select>
+                    <span class="text-sm text-slate-400">min</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div v-if="summary" class="bg-slate-800 border border-slate-700 rounded-b-xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-700/50 text-slate-300 text-sm uppercase">
+                            <th v-for="col in columns" :key="col.key" :style="col.width ? { width: col.width } : {}" 
+                                @click="setSort(col.key)"
+                                class="px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors"
+                                :class="{'text-blue-400 font-bold': sortKey === col.key, 'sort-asc': sortKey === col.key && sortOrder === 1, 'sort-desc': sortKey === col.key && sortOrder === -1}">
+                                {{ col.label }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        <tr v-for="station in paginatedStations" :key="[station.callsign, station.band, station.mode, station.frequency, station.pota_reference, station.potential].join('|')" 
+                            class="hover:bg-slate-700/30 transition-colors"
+                            :class="getQrzRowClass(station)">
+                            <td class="px-6 py-4 font-mono font-bold text-blue-300">
+                                <div class="flex flex-col items-start gap-1">
+                                    <a :href="`https://www.qrz.com/db/${station.callsign}`" target="_blank" class="hover:text-blue-400 hover:underline transition-colors">
+                                        {{ station.callsign }}
+                                    </a>
+                                    <span v-if="station.potential"
+                                          class="font-sans font-semibold text-[10px] uppercase tracking-wide bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/40 whitespace-nowrap">
+                                        potential
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <template v-if="station.pota_reference">
+                                    <a :href="`https://pota.app/#/park/${station.pota_reference}`" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
+                                        <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.dx_country : station.dx_country" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.dx_country }}</span>
+                                    </a>
+                                </template>
+                                <template v-else>
+                                    <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.dx_country : station.dx_country" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.dx_country }}</span>
+                                </template>
+                            </td>
+                            <td class="px-6 py-4 text-xs font-mono text-slate-500">{{ station.dxcc || '-' }}</td>
+                            <td class="px-6 py-4">{{ station.spotter_country || station.spotter }}</td>
+                            <td class="px-6 py-4">
+                                <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-sm font-mono" style="width: 160px;">
+                                {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : '—' }}
+                            </td>
+                            <td class="px-6 py-4">
+                                <span v-if="station.mode" @click="searchQuery = searchQuery ? searchQuery + ',' + station.mode : station.mode" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.mode }}</span>
+                                <span v-else-if="station.comment" @click="searchQuery = searchQuery ? searchQuery + ',' + station.comment : station.comment" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.comment }}</span>
+                                <span v-else>-</span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-400">{{ station.potential ? 'not spotted' : formatDate(station.last_update) }}</td>
+                            <td class="px-3 py-4 align-middle whitespace-nowrap">
+                                <div class="inline-flex items-center gap-1" :title="(station.sources && station.sources.length ? station.sources : [station.source]).join(', ')">
+                                    <span v-for="src in (station.sources && station.sources.length ? station.sources : [station.source])"
+                                          :key="src"
+                                          class="text-[10px] leading-none bg-blue-900/50 text-blue-300 px-1.5 py-0.5 rounded-full border border-blue-700/50">
+                                        {{ src }}
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="filteredStations.length === 0">
+                            <td colspan="9" class="px-6 py-12 text-center text-slate-500 italic">
+                                No stations found matching your criteria.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="px-6 py-4 bg-slate-700/30 border-t border-slate-700 flex items-center justify-between">
+                <div class="text-sm text-slate-400">
+                    Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, filteredStations.length) }} of {{ filteredStations.length }} entries
+                </div>
+                <div class="flex gap-2">
+                    <button @click="currentPage--" :disabled="currentPage === 1" 
+                            class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Previous
+                    </button>
+                    <button @click="currentPage++" :disabled="currentPage * pageSize >= filteredStations.length" 
+                            class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loading && !summary" class="flex flex-col items-center justify-center py-20">
+            <i class="fas fa-circle-notch fa-spin text-4xl text-blue-500 mb-4"></i>
+            <p class="text-slate-400">Fetching DX data...</p>
+        </div>
+
+        <!-- Error State -->
+        <div v-if="error" class="bg-red-900/20 border border-red-500/50 text-red-400 p-4 rounded-xl flex items-center gap-3">
+            <i class="fas fa-exclamation-triangle"></i>
+            {{ error }}
+            <button @click="fetchData" class="ml-auto underline font-bold">Retry</button>
+        </div>
+
+        <!-- QRZ Token Modal -->
+        <div v-if="showModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="closeModal">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+                <h2 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                    <i class="fas fa-key"></i> QRZ.com API Credentials
+                </h2>
+                <div v-if="needsRenewal" class="bg-amber-900/30 border border-amber-600/50 text-amber-300 p-3 rounded-lg text-sm mb-4">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Your QRZ token appears to be expired. Please enter a new token below.
+                </div>
+                <div class="space-y-4">
+                    <div v-if="showCallsignField">
+                        <label class="block text-sm text-slate-400 mb-1">Callsign</label>
+                        <input v-model="qrzCallsign" type="text" placeholder="AB1CD"
+                               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase">
+                    </div>
+                    <div v-if="showTokenField">
+                        <label class="block text-sm text-slate-400 mb-1">API Token</label>
+                        <input v-model="qrzToken" type="password" placeholder="Enter your QRZ.com API token"
+                               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6 justify-end">
+                    <button @click="closeModal" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">
+                        Cancel
+                    </button>
+                    <button @click="saveQrzToken" :disabled="saving" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50">
+                        {{ saving ? 'Saving...' : 'Save' }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+
     <script>
-        const { createApp, ref, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, onBeforeUnmount } = Vue;
+
         createApp({
             setup() {
-                const displayUtc = ref(localStorage.getItem('displayUtc') !== 'false');
-                const setDisplayUtc = (enabled) => {
-                    displayUtc.value = !!enabled;
-                    localStorage.setItem('displayUtc', displayUtc.value.toString());
+                const summary = ref(null);
+                const loading = ref(false);
+                const error = ref(null);
+                const searchQuery = ref('');
+                const sortKey = ref('last_update');
+                const sortOrder = ref(-1);
+                const pageSize = ref(25);
+                const maxAgeMinutes = ref(30);
+                const currentPage = ref(1);
+                const showModal = ref(false);
+                const saving = ref(false);
+                const qrzCallsign = ref('');
+                const qrzToken = ref('');
+                const qrzReady = ref(false);
+                const showCallsignField = ref(true);
+                const showTokenField = ref(true);
+                const syncStatus = ref('idle');
+                const needsRenewal = ref(false);
+                let syncTimeout = null;
+                const nextRefreshTime = ref(new Date(Date.now() + 5 * 60 * 1000));
+                const qrzFilterEnabled = ref(localStorage.getItem('qrzFilterEnabled') === 'true');
+                const potaEnabled = ref(localStorage.getItem('potaEnabled') !== 'false');
+                const qrzCacheData = ref([]);
+                const qrzCacheMap = ref(new Map());
+                const qrzCacheInfo = ref({ exists: false, count: 0, last_modified: '' });
+                const qrzAllBands = ref(new Map());
+                const qrzConfirmedDxccNumbers = ref(new Set());
+                const wantedMode = ref(parseInt(localStorage.getItem('wantedMode') || '0'));
+
+                const loadQrzCache = async () => {
+                    try {
+                        const resp = await fetch('/qrz-cache');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            qrzCacheData.value = data.data || [];
+                            qrzCacheInfo.value = { exists: data.exists || false, count: data.count || 0, last_modified: data.last_modified || '' };
+                            const map = new Map();
+                            for (const [call, band, dxcc] of (data.data || [])) {
+                                const key = call.toUpperCase();
+                                if (!map.has(key)) map.set(key, new Set());
+                                map.get(key).add(band.toUpperCase());
+                            }
+                            qrzCacheMap.value = map;
+                        }
+                    } catch {
+                        qrzCacheData.value = [];
+                        qrzCacheMap.value = new Map();
+                        qrzConfirmedDxccNumbers.value = new Set();
+                        qrzCacheInfo.value = { exists: false, count: 0, last_modified: '' };
+                    }
+                    try {
+                        const resp = await fetch('/qrz-dxcc-numbers');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const dxccSet = new Set();
+                            for (const dxcc of (data.data || [])) {
+                                const normalized = dxcc.toString().trim().replace(/^0+/, '');
+                                if (normalized) {
+                                    dxccSet.add(normalized);
+                                }
+                            }
+                            qrzConfirmedDxccNumbers.value = dxccSet;
+                        }
+                    } catch {
+                        qrzConfirmedDxccNumbers.value = new Set();
+                    }
+                    try {
+                        const resp = await fetch('/qrz-all-data');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const map = new Map();
+                            for (const [call, band, status] of (data.data || [])) {
+                                const key = call.toUpperCase();
+                                if (!map.has(key)) map.set(key, new Set());
+                                map.get(key).add(band.toUpperCase());
+                            }
+                            qrzAllBands.value = map;
+                        }
+                    } catch {
+                        qrzAllBands.value = new Map();
+                    }
                 };
+
+                const toggleQrzFilter = () => {
+                    qrzFilterEnabled.value = !qrzFilterEnabled.value;
+                    localStorage.setItem('qrzFilterEnabled', qrzFilterEnabled.value.toString());
+                };
+
+                const togglePota = () => {
+                    potaEnabled.value = !potaEnabled.value;
+                    localStorage.setItem('potaEnabled', potaEnabled.value.toString());
+                    fetchData();
+                };
+
+                const toggleWanted = () => {
+                    wantedMode.value = (wantedMode.value + 1) % 3;
+                    localStorage.setItem('wantedMode', wantedMode.value.toString());
+                };
+
+                const getQrzRowClass = (station) => {
+                    if (!qrzFilterEnabled.value && wantedMode.value === 0) return '';
+                    
+                    if (station.source === 'POTA' && potaEnabled.value) return '';
+                    
+                    const call = station.callsign.toUpperCase();
+                    const stationBands = getStationBands(station);
+                    
+                    const confirmedBands = qrzCacheMap.value.get(call);
+                    if (qrzFilterEnabled.value && confirmedBands) {
+                        for (const b of stationBands) {
+                            if (confirmedBands.has(b)) return '';
+                        }
+                    }
+                    
+                    if (wantedMode.value >= 1 && station.dxcc) {
+                        const normalized = station.dxcc.toString().trim().replace(/^0+/, '');
+                        if (normalized && !qrzConfirmedDxccNumbers.value.has(normalized)) {
+                            return 'bg-red-500/30';
+                        }
+                    }
+                    
+                    const allBands = qrzAllBands.value.get(call);
+                    if (allBands) {
+                        return 'bg-amber-900/20';
+                    }
+                    
+                    return '';
+                };
+
+                const getStationBands = (station) => {
+                    if (station.band) return [station.band.toUpperCase()];
+                    return [];
+                };
+
+
+                const checkQrzStatus = async () => {
+                    try {
+                        const resp = await fetch('/qrz-status');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            qrzReady.value = data.has_credentials;
+                        }
+                    } catch {
+                        qrzReady.value = false;
+                    }
+                };
+
+                const columns = [
+                    { key: 'callsign', label: 'DX Callsign' },
+                    { key: 'dx_country', label: 'DX Location' },
+                    { key: 'dxcc', label: 'DXCC' },
+                    { key: 'spotter_country', label: 'Spotter' },
+                    { key: 'band', label: 'Band' },
+                    { key: 'frequency', label: 'Frequency', width: '160px' },
+                    { key: 'mode', label: 'Mode/Comment' },
+                    { key: 'last_update', label: 'Updated' },
+                    { key: 'source', label: 'Source', width: '220px' },
+                ];
+
+                const fetchData = async () => {
+                    loading.value = true;
+                    error.value = null;
+                    try {
+                        let url = '/data';
+                        if (!potaEnabled.value) {
+                            url += '?exclude_sources=POTA';
+                        }
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        summary.value = await response.json();
+                        summary.value.last_refresh = new Date().toISOString();
+                        nextRefreshTime.value = new Date(Date.now() + 5 * 60 * 1000);
+                    } catch (e) {
+                        error.value = `Failed to load data: ${e.message}. Ensure the API is running.`;
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const setSort = (key) => {
+                    if (sortKey.value === key) {
+                        sortOrder.value *= -1;
+                    } else {
+                        sortKey.value = key;
+                        sortOrder.value = 1;
+                    }
+                };
+
+                const filteredStations = computed(() => {
+                    try {
+                        if (!summary.value || !summary.value.stations) return [];
+                        let data = [...summary.value.stations];
+                        const cutoffTime = Date.now() - maxAgeMinutes.value * 60 * 1000;
+                        data = data.filter(s => {
+                            if (s.potential) return true;
+                            const updateTime = new Date(s.last_update).getTime();
+                            return updateTime >= cutoffTime;
+                        });
+                        if (qrzFilterEnabled.value && qrzCacheMap.value && qrzCacheMap.value.size) {
+                            const sCall = (s) => s.callsign.toUpperCase();
+                            const sBands = (s) => {
+                                if (s.band) return [s.band.toUpperCase()];
+                                return [];
+                            };
+                            data = data.filter(s => {
+                                if (s.source === 'POTA' && potaEnabled.value) return true;
+                                const call = sCall(s);
+                                const bands = sBands(s);
+                                const qBands = qrzCacheMap.value.get(call);
+                                if (!qBands) return true;
+                                for (const b of bands) {
+                                    if (qBands.has(b)) return false;
+                                }
+                                return true;
+                            });
+                        }
+                        if (wantedMode.value === 2) {
+                            data = data.filter(s => {
+                                if (s.source === 'POTA' && potaEnabled.value) return true;
+                                if (!s.dxcc) return false;
+                                const normalized = s.dxcc.toString().trim().replace(/^0+/, '');
+                                return normalized && !qrzConfirmedDxccNumbers.value.has(normalized);
+                            });
+                        }
+                        if (searchQuery.value) {
+                            const q = searchQuery.value.toLowerCase();
+                            const orGroups = q.split('|').map(g => g.split(',').map(t => t.trim()).filter(Boolean));
+                            data = data.filter(s => {
+                                const searchable = [
+                                    s.callsign, s.dx_country, s.spotter_country, s.spotter,
+                                    s.band, s.mode, s.comment, s.source, s.frequency,
+                                    s.potential ? 'potential' : ''
+                                ].filter(Boolean).map(v => v.toString().toLowerCase());
+                                return orGroups.some(andGroup => 
+                                    andGroup.every(term => 
+                                        searchable.some(field => field.includes(term))
+                                    )
+                                );
+                            });
+                        }
+                        data.sort((a, b) => {
+                            let valA = a[sortKey.value];
+                            let valB = b[sortKey.value];
+                            if (Array.isArray(valA)) valA = valA.join(', ');
+                            if (Array.isArray(valB)) valB = valB.join(', ');
+                            if (valA === null || valA === undefined) valA = '';
+                            if (valB === null || valB === undefined) valB = '';
+                            if (valA < valB) return -1 * sortOrder.value;
+                            if (valA > valB) return 1 * sortOrder.value;
+                            return 0;
+                        });
+                        return data;
+                    } catch (e) {
+                        console.error('filteredStations error:', e);
+                        return [];
+                    }
+                });
+
+                const paginatedStations = computed(() => {
+                    const start = (currentPage.value - 1) * pageSize.value;
+                    return filteredStations.value.slice(start, start + pageSize.value);
+                });
+
                 const formatDate = (dateStr) => {
                     if (!dateStr) return 'N/A';
                     const date = new Date(dateStr);
-                    if (Number.isNaN(date.getTime())) return dateStr;
-                    const opts = { hour12: false };
-                    if (displayUtc.value) {
-                        opts.timeZone = 'UTC';
-                        return date.toLocaleString(undefined, opts) + ' UTC';
-                    }
-                    return date.toLocaleString(undefined, opts);
+                    return date.toLocaleString(undefined, { hour12: false });
                 };
-                return { displayUtc, setDisplayUtc, formatDate };
+
+                const countdownText = ref('5:00');
+
+                const updateCountdown = () => {
+                    const diff = nextRefreshTime.value - Date.now();
+                    if (diff <= 0) {
+                        countdownText.value = '0:00';
+                    } else {
+                        const mins = Math.floor(diff / 60000);
+                        const secs = Math.floor((diff % 60000) / 1000);
+                        countdownText.value = `${mins}:${secs.toString().padStart(2, '0')}`;
+                    }
+                };
+
+                const refreshInterval = setInterval(() => {
+                    fetchData();
+                    nextRefreshTime.value = new Date(Date.now() + 5 * 60 * 1000);
+                    updateCountdown();
+                }, 5 * 60 * 1000);
+
+                const countdownInterval = setInterval(updateCountdown, 1000);
+
+                onBeforeUnmount(() => {
+                    clearInterval(refreshInterval);
+                    clearInterval(countdownInterval);
+                });
+
+                onMounted(fetchData);
+                onMounted(checkQrzStatus);
+                onMounted(loadQrzCache);
+
+                onMounted(fetchData);
+                onMounted(checkQrzStatus);
+                onMounted(loadQrzCache);
+
+                const showQrzModal = () => {
+                    showModal.value = true;
+                    showCallsignField.value = true;
+                    showTokenField.value = true;
+                    qrzCallsign.value = '';
+                    qrzToken.value = '';
+                    needsRenewal.value = false;
+                    checkQrzStatus().then(() => {
+                        if (qrzReady.value) {
+                            fetch('/qrz-status').then(r => r.json()).then(data => {
+                                qrzCallsign.value = data.callsign || '';
+                                qrzToken.value = '';
+                                showCallsignField.value = !!(data.callsign);
+                                showTokenField.value = true;
+                            });
+                        }
+                    });
+                };
+
+                const closeModal = () => {
+                    showModal.value = false;
+                };
+
+                const saveQrzToken = async () => {
+                    saving.value = true;
+                    try {
+                        const resp = await fetch('/qrz-token', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                callsign: qrzCallsign.value,
+                                token: qrzToken.value
+                            })
+                        });
+                        if (!resp.ok) {
+                            const err = await resp.json();
+                            throw new Error(err.detail || 'Failed to save');
+                        }
+                        qrzReady.value = true;
+                        closeModal();
+                        await loadQrzCache();
+                        const syncResp = await fetch('/qrz-sync');
+                        const syncData = await syncResp.json();
+                        if (syncData.status === 'ok') {
+                            syncStatus.value = 'success';
+                            qrzCacheInfo.value.last_modified = new Date().toLocaleString(undefined, { hour12: false });
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
+                        } else {
+                            syncStatus.value = 'error';
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                        }
+                    } catch (e) {
+                    } finally {
+                        saving.value = false;
+                    }
+                };
+
+                const syncQrzData = async () => {
+                    if (syncStatus.value === 'syncing') return;
+                    if (!qrzReady.value) {
+                        showQrzModal();
+                        return;
+                    }
+                    syncStatus.value = 'syncing';
+                    try {
+                        const resp = await fetch('/qrz-sync');
+                        const data = await resp.json();
+                        if (data.status === 'ok') {
+                            syncStatus.value = 'success';
+                            await loadQrzCache();
+                            qrzCacheInfo.value.last_modified = new Date().toLocaleString(undefined, { hour12: false });
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
+                        } else if (data.needs_renewal) {
+                            syncStatus.value = 'error';
+                            needsRenewal.value = true;
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                            showQrzModal();
+                        } else {
+                            syncStatus.value = 'error';
+                            clearTimeout(syncTimeout);
+                            syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                        }
+                    } catch {
+                        syncStatus.value = 'error';
+                        clearTimeout(syncTimeout);
+                        syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
+                    }
+                };
+
+                return {
+                    summary, loading, error, searchQuery, 
+                    sortKey, sortOrder, pageSize, maxAgeMinutes, currentPage,
+                    columns, filteredStations, paginatedStations,
+                    fetchData, setSort, formatDate, countdownText,
+                    showModal, showQrzModal, closeModal, saveQrzToken,
+                    saving, qrzCallsign, qrzToken, qrzReady,
+                    showCallsignField, showTokenField,
+                    syncStatus, syncQrzData, needsRenewal,
+                    qrzFilterEnabled, qrzCacheData, qrzCacheInfo, toggleQrzFilter,
+                    getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
+                    wantedMode, toggleWanted,
+                };
             }
         }).mount('#app');
     </script>
