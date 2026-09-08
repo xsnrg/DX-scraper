@@ -184,7 +184,7 @@
                         <tr class="bg-slate-700/50 text-slate-300 text-sm uppercase">
                             <th v-for="col in columns" :key="col.key" :style="col.width ? { width: col.width, minWidth: col.width } : {}" 
                                 @click="setSort(col.key)"
-                                class="px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors"
+                                class="px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors break-words"
                                 :class="{'text-blue-400 font-bold': sortKey === col.key, 'sort-asc': sortKey === col.key && sortOrder === 1, 'sort-desc': sortKey === col.key && sortOrder === -1}">
                                 {{ col.label }}
                             </th>
@@ -223,12 +223,12 @@
                             <td class="px-6 py-4 text-sm font-mono" style="width: 160px;">
                                 {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : '—' }}
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-6 py-4 break-words">
                                 <span v-if="station.mode" @click="searchQuery = searchQuery ? searchQuery + ',' + station.mode : station.mode" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.mode }}</span>
                                 <span v-else-if="station.comment" @click="searchQuery = searchQuery ? searchQuery + ',' + station.comment : station.comment" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.comment }}</span>
                                 <span v-else>-</span>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-400">{{ station.potential ? 'not spotted' : formatDate(station.last_update) }}</td>
+                            <td class="px-6 py-4 text-sm text-slate-400 break-words">{{ station.potential ? 'not spotted' : formatDate(station.last_update) }}</td>
                             <td class="px-3 py-4 align-middle">
                                 <div class="flex flex-wrap items-center gap-1 min-w-0" :title="(station.sources && station.sources.length ? station.sources : [station.source]).join(', ')">
                                     <a v-for="src in (station.sources && station.sources.length ? station.sources : [station.source])"
@@ -481,9 +481,9 @@
                     { key: 'spotter_country', label: 'Spotter' },
                     { key: 'band', label: 'Band' },
                     { key: 'frequency', label: 'Frequency', width: '160px' },
-                    { key: 'mode', label: 'Mode/Comment' },
-                    { key: 'last_update', label: 'Updated' },
-                    { key: 'source', label: 'Source', width: '16rem' },
+                    { key: 'mode', label: 'Mode/Comment', width: '8rem' },
+                    { key: 'last_update', label: 'Updated', width: '9rem' },
+                    { key: 'source', label: 'Source', width: '14rem' },
                 ];
 
                 const SOURCE_LOOKUP = {
