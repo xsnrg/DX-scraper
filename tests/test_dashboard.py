@@ -102,3 +102,38 @@ def test_countdown_text_visible(page: Page):
     """Countdown text is visible under the refresh button."""
     open_dashboard(page)
     expect(page.get_by_text("Refresh in")).to_be_visible()
+
+
+def test_timezone_slider_visible_at_top(page: Page):
+    """Local/UTC slider is rendered at the top of the page."""
+    open_dashboard(page)
+    slider = page.locator("#tz-slider")
+    expect(slider).to_be_visible()
+    bar = page.locator("#tz-toggle-bar")
+    expect(bar).to_contain_text("Local")
+    expect(bar).to_contain_text("UTC")
+    header_box = page.locator("header").first.bounding_box()
+    slider_box = slider.bounding_box()
+    assert slider_box is not None and header_box is not None
+    assert slider_box["y"] < header_box["y"]
+
+
+def test_timezone_slider_defaults_to_utc(page: Page):
+    """Times include a UTC suffix when the slider is in the default UTC position."""
+    open_dashboard(page)
+    expect(page.locator("#tz-slider")).to_have_value("1")
+    expect(page.locator("div.grid").first).to_contain_text("UTC")
+
+
+def test_timezone_slider_toggles_to_local_and_persists(page: Page):
+    """Sliding to Local removes the UTC suffix and stores the preference."""
+    open_dashboard(page)
+    page.locator("#tz-slider").fill("0")
+    expect(page.locator("#tz-slider")).to_have_value("0")
+    expect(page.locator("div.grid").first).not_to_contain_text("UTC")
+    stored = page.evaluate("() => localStorage.getItem('displayUtc')")
+    assert stored == "false"
+
+    page.reload()
+    expect(page.locator("#tz-slider")).to_have_value("0")
+    expect(page.locator("div.grid").first).not_to_contain_text("UTC")
