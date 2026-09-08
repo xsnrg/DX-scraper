@@ -1,1 +1,64 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXpedition Monitor</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [v-cloak] { display: none; }
+        .sort-asc::after { content: ' \2191'; }
+        .sort-desc::after { content: ' \2193'; }
+        .tz-slider {
+            width: 2.75rem;
+            height: 1.5rem;
+            appearance: none;
+            -webkit-appearance: none;
+            background: #334155;
+            border-radius: 9999px;
+            position: relative;
+            cursor: pointer;
+            outline: none;
+        }
+        .tz-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 1.15rem;
+            height: 1.15rem;
+            border-radius: 9999px;
+            background: #e2e8f0;
+            border: 0;
+            margin-top: 0;
+        }
+        .tz-slider::-moz-range-thumb {
+            width: 1.15rem;
+            height: 1.15rem;
+            border-radius: 9999px;
+            background: #e2e8f0;
+            border: 0;
+        }
+        .tz-slider.utc-on {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+    <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
+        <!-- Timezone display toggle -->
+        <div class="mb-4 flex items-center justify-end gap-3 text-sm text-slate-300" id="tz-toggle-bar">
+            <span :class="displayUtc ? 'text-slate-500' : 'text-slate-100 font-semibold'">Local</span>
+            <input type="range" min="0" max="1" step="1"
+                   class="tz-slider"
+                   :class="{ 'utc-on': displayUtc }"
+                   :value="displayUtc ? 1 : 0"
+                   @input="setDisplayUtc($event.target.value === '1')"
+                   aria-label="Toggle between local browser time and UTC"
+                   id="tz-slider">
+            <span :class="displayUtc ? 'text-blue-300 font-semibold' : 'text-slate-500'">UTC</span>
+        </div>
+        SEE_REPO_FILE_ON_DISK
+    </div>
+</body>
+</html>
