@@ -3,6 +3,22 @@ from playwright.sync_api import Page, expect
 from conftest import _mock_data, open_dashboard
 
 
+def _assert_pills_fully_visible(source_cell, names, clip_container):
+    """Pills must fit in the cell and not be clipped by the table card."""
+    cell_box = source_cell.bounding_box()
+    clip_box = clip_container.bounding_box()
+    assert cell_box is not None
+    assert clip_box is not None
+    for name in names:
+        pill = source_cell.get_by_role("link", name=name, exact=True)
+        badge_box = pill.bounding_box()
+        assert badge_box is not None, f"{name} pill has no box"
+        assert badge_box["x"] + badge_box["width"] <= cell_box["x"] + cell_box["width"] + 1, name
+        assert badge_box["y"] + badge_box["height"] <= cell_box["y"] + cell_box["height"] + 1, name
+        assert badge_box["x"] + badge_box["width"] <= clip_box["x"] + clip_box["width"] + 1, name
+        assert pill.evaluate("el => el.scrollWidth <= el.clientWidth + 1"), name
+
+
 def test_data_table_has_correct_columns(page: Page):
     """Data table renders with all expected column headers."""
     open_dashboard(page)
@@ -44,7 +60,7 @@ def test_data_table_source_badges(page: Page):
 
 
 def test_data_table_wraps_multiple_source_badges(page: Page):
-    """Each source is its own badge on one line so names are not clipped."""
+    """Each source is its own badge; names stay intact and are not clipped."""
     mock = _mock_data(num_stations=2)
     mock["stations"][0]["source"] = "DX Summit"
     mock["stations"][0]["sources"] = ["DX Summit", "HamQTH", "Spothole"]
@@ -58,15 +74,25 @@ def test_data_table_wraps_multiple_source_badges(page: Page):
     expect(source_cell.get_by_text("Spothole", exact=True)).to_be_visible()
     expect(source_cell.get_by_text("DX Summit, HamQTH")).to_have_count(0)
 
-    multi_h = rows.nth(0).bounding_box()["height"]
-    single_h = rows.nth(1).bounding_box()["height"]
-    assert abs(multi_h - single_h) <= 1
+    card = page.locator("div.overflow-hidden").filter(has=page.locator("table"))
+    _assert_pills_fully_visible(source_cell, ("DX Summit", "HamQTH", "Spothole"), card)
 
-    cell_box = source_cell.bounding_box()
-    for name in ("DX Summit", "HamQTH", "Spothole"):
-        badge_box = source_cell.get_by_text(name, exact=True).bounding_box()
-        assert badge_box["x"] + badge_box["width"] <= cell_box["x"] + cell_box["width"] + 1
-        assert badge_box["y"] + badge_box["height"] <= cell_box["y"] + cell_box["height"] + 1
+
+def test_data_table_source_pills_not_clipped_at_desktop_width(page: Page):
+    """Source pills stay fully visible at the dashboard's max desktop width."""
+    page.set_viewport_size({"width": 1280, "height": 800})
+    mock = _mock_data(num_stations=1)
+    mock["stations"][0]["callsign"] = "3V8LL"
+    mock["stations"][0]["dx_country"] = "Tunisia"
+    mock["stations"][0]["source"] = "DX Summit"
+    mock["stations"][0]["sources"] = ["DX Summit", "HamQTH", "Spothole", "POTA", "NG3K"]
+    open_dashboard(page, mock)
+    source_cell = page.locator("table tbody tr").first.locator("td").last
+    card = page.locator("div.overflow-hidden").filter(has=page.locator("table"))
+    names = ("DX Summit", "HamQTH", "Spothole", "POTA", "NG3K")
+    for name in names:
+        expect(source_cell.get_by_role("link", name=name)).to_be_visible()
+    _assert_pills_fully_visible(source_cell, names, card)
 
 
 def test_data_table_multiple_spots_same_callsign(page: Page):

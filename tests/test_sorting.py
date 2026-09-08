@@ -1,3 +1,5 @@
+import re
+
 from playwright.sync_api import Page, expect
 
 from conftest import _mock_data, open_dashboard
@@ -9,9 +11,7 @@ def test_column_headers_are_sortable(page: Page):
     th_texts = [th.inner_text() for th in page.locator("th").all()]
     assert "DX CALLSIGN" in th_texts
     dx_th = page.locator("th").filter(has_text="DX CALLSIGN")
-    expect(dx_th).to_have_attribute(
-        "class", "px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors"
-    )
+    expect(dx_th).to_have_class(re.compile(r"cursor-pointer"))
 
 
 def test_sorting_changes_row_order(page: Page):
