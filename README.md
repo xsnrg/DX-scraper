@@ -17,6 +17,7 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 - **POTA toggle** — Include or exclude Parks On The Air activations; park references link to pota.app
 - **Spot age** — 10 / 20 / 30 / 60 minute cutoff on the dashboard (potential rows are exempt)
 - **Search** — Comma = AND, pipe = OR. Click Band, Mode, or DX Location to append an AND term. Search `potential` to list unspotted DXpeditions
+- **Source pills** — Each source badge is a link to that site with the DX callsign as the lookup/filter parameter
 - **DXCC QSL map** — Leaflet map of confirmed countries from your QRZ log (Big CTY, 345 entities)
 - **REST API + CLI** — JSON for other tools; `python src/main.py --format table` for a terminal view
 

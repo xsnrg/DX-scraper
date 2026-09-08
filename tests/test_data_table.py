@@ -93,3 +93,86 @@ def test_data_table_empty_state(page: Page):
     """Table shows empty state message when no stations match."""
     open_dashboard(page, _mock_data(num_stations=0))
     expect(page.get_by_text("No stations found matching your criteria.")).to_be_visible()
+
+
+def test_data_table_source_pills_link_to_source_with_callsign(page: Page):
+    """Source pills are links to the source site with the DX callsign as a parameter."""
+    mock = _mock_data(num_stations=2)
+    mock["stations"][0]["callsign"] = "W1AW"
+    mock["stations"][0]["source"] = "DX Summit"
+    mock["stations"][0]["sources"] = ["DX Summit", "HamQTH", "Spothole"]
+    mock["stations"][1]["callsign"] = "VK3EPR"
+    mock["stations"][1]["source"] = "NG3K"
+    mock["stations"][1]["sources"] = ["NG3K"]
+    open_dashboard(page, mock)
+
+    first = page.locator("table tbody tr").nth(0).locator("td").last
+    summit = first.get_by_role("link", name="DX Summit")
+    expect(summit).to_have_attribute("href", "http://www.dxsummit.fi/#/?dx_calls=W1AW")
+    expect(summit).to_have_attribute("target", "_blank")
+    expect(summit).to_have_attribute("rel", "noopener noreferrer")
+    expect(first.get_by_role("link", name="HamQTH")).to_have_attribute(
+        "href", "https://www.hamqth.com/W1AW"
+    )
+    expect(first.get_by_role("link", name="Spothole")).to_have_attribute(
+        "href", "https://spothole.app/?text_includes=W1AW"
+    )
+
+    ng3k = page.locator("table tbody tr").nth(1).locator("td").last.get_by_role("link", name="NG3K")
+    expect(ng3k).to_have_attribute(
+        "href", "https://www.ng3k.com/cgi-bin/adxo.pl?query=VK3EPR"
+    )
+    expect(ng3k).to_have_attribute("target", "_blank")
+
+
+def test_data_table_pota_source_pill_links_to_profile(page: Page):
+    """POTA source pill opens the activator profile for the callsign."""
+    mock = _mock_data(num_stations=1)
+    mock["stations"][0]["callsign"] = "P29V"
+    mock["stations"][0]["source"] = "POTA"
+    mock["stations"][0]["sources"] = ["POTA"]
+    open_dashboard(page, mock)
+    pill = page.locator("table tbody tr").first.locator("td").last.get_by_role("link", name="POTA")
+    expect(pill).to_have_attribute("href", "https://pota.app/#/profile/P29V")
+    expect(pill).to_have_attribute("target", "_blank")
+
+
+def test_data_table_dx_cluster_pill_links_to_spothole(page: Page):
+    """Legacy DX Cluster source name still opens a Spothole lookup for the call."""
+    mock = _mock_data(num_stations=1)
+    mock["stations"][0]["callsign"] = "VK3EPR"
+    mock["stations"][0]["source"] = "DX Cluster"
+    mock["stations"][0]["sources"] = ["DX Cluster"]
+    open_dashboard(page, mock)
+    pill = page.locator("table tbody tr").first.locator("td").last.get_by_role(
+        "link", name="DX Cluster"
+    )
+    expect(pill).to_have_attribute(
+        "href", "https://spothole.app/?text_includes=VK3EPR"
+    )
+
+
+def test_data_table_source_pill_encodes_portable_callsign(page: Page):
+    """Slash callsigns are encoded in every source lookup URL."""
+    mock = _mock_data(num_stations=1)
+    mock["stations"][0]["callsign"] = "V4/WW6W"
+    mock["stations"][0]["source"] = "DX Summit"
+    mock["stations"][0]["sources"] = ["DX Summit", "HamQTH", "Spothole", "POTA", "NG3K"]
+    open_dashboard(page, mock)
+    cell = page.locator("table tbody tr").first.locator("td").last
+    encoded = "V4%2FWW6W"
+    expect(cell.get_by_role("link", name="DX Summit")).to_have_attribute(
+        "href", f"http://www.dxsummit.fi/#/?dx_calls={encoded}"
+    )
+    expect(cell.get_by_role("link", name="HamQTH")).to_have_attribute(
+        "href", f"https://www.hamqth.com/{encoded}"
+    )
+    expect(cell.get_by_role("link", name="Spothole")).to_have_attribute(
+        "href", f"https://spothole.app/?text_includes={encoded}"
+    )
+    expect(cell.get_by_role("link", name="POTA")).to_have_attribute(
+        "href", f"https://pota.app/#/profile/{encoded}"
+    )
+    expect(cell.get_by_role("link", name="NG3K")).to_have_attribute(
+        "href", f"https://www.ng3k.com/cgi-bin/adxo.pl?query={encoded}"
+    )
