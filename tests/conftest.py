@@ -1,8 +1,32 @@
 import json
+import os
+import tempfile
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 import pytest
+
+# Snapshot the user's environment BEFORE the isolation override below, so
+# acceptance tests can resolve the same config dir the live server uses.
+_RAW_ENV = dict(os.environ)
+
+
+def resolve_server_config_dir(environ=None) -> Path:
+    """Config dir the live acceptance server reads (override or default)."""
+    env = _RAW_ENV if environ is None else environ
+    override = env.get("DXPEDITION_CONFIG_DIR")
+    if override:
+        return Path(override)
+    return Path.home() / ".config" / "dxscraper"
+
+
+# Redirect config/log/cache to a temp dir before any src.* import so tests
+# can never write to the developer's real ~/.config/dxscraper.
+os.environ.setdefault(
+    "DXPEDITION_CONFIG_DIR",
+    tempfile.mkdtemp(prefix="dxscraper_test_"),
+)
 
 DASHBOARD_URL = "http://127.0.0.1:8000"
 

@@ -29,7 +29,7 @@ def _setup_logging():
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(fmt)
     root.addHandler(fh)
-    sh = logging.StreamHandler(sys.stdout)
+    sh = logging.StreamHandler(sys.stderr)
     sh.setLevel(logging.INFO)
     sh.setFormatter(fmt)
     root.addHandler(sh)
@@ -418,26 +418,27 @@ async def sync_qso_data(callsign: str, token: str) -> dict:
             existing = _read_cache()
             return {'status': 'ok', 'total_qsos': len(existing), 'synced_count': 0}
 
-        # Deduplicate by (call, time_on)
-        seen = set()
-        unique_records = []
+        # Deduplicate within fetched batch by (call, time_on)
+        batch: dict[tuple, QSORecord] = {}
         for rec in records:
-            key = (rec.call, rec.time_on)
-            if key not in seen:
-                seen.add(key)
-                unique_records.append(rec)
+            batch[(rec.call, rec.time_on)] = rec
 
-        # Append to cache file
-        _write_cache(unique_records, is_full=False)
+        # Upsert into existing cache: freshly fetched records overwrite stale
+        # cached rows (e.g. status changes returned by MODSINCE fetches).
+        merged: dict[tuple, QSORecord] = {}
+        for rec in _read_cache():
+            merged[(rec.call, rec.time_on)] = rec
+        merged.update(batch)
+        unique_records = list(merged.values())
 
-        # Count total records in cache
-        existing = _read_cache()
+        # Rewrite cache file with merged records
+        _write_cache(unique_records, is_full=True)
 
         # Update last_sync timestamp
         now = datetime.now(timezone.utc).isoformat()
         save_last_sync(now)
 
-        return {'status': 'ok', 'total_qsos': len(existing), 'synced_count': len(unique_records)}
+        return {'status': 'ok', 'total_qsos': len(unique_records), 'synced_count': len(batch)}
     except QRZDataError as e:
         return {'status': 'error', 'error': str(e)}
     except Exception as e:

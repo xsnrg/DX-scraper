@@ -35,6 +35,17 @@ def test_next_page_button_works(page: Page):
     expect(page.get_by_text("Showing 11 to 15 of 15 entries")).to_be_visible()
 
 
+def test_search_resets_to_first_page(page: Page):
+    """Typing a search query while on page 2 resets pagination to page 1."""
+    open_dashboard(page, _mock_data(num_stations=15))
+    page.get_by_role("combobox").first.select_option("10")
+    page.get_by_role("button", name="Next").click()
+    expect(page.get_by_text("Showing 11 to 15 of 15 entries")).to_be_visible()
+    page.fill('input[placeholder*="Search"]', "W1AW")
+    expect(page.get_by_text("Showing 1 to 1 of 1 entries")).to_be_visible()
+    expect(page.get_by_role("cell", name="W1AW")).to_be_visible()
+
+
 def test_previous_button_disabled_on_first_page(page: Page):
     """Previous button is disabled when on the first page."""
     open_dashboard(page)

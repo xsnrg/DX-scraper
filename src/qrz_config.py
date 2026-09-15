@@ -8,7 +8,15 @@ from typing import Optional
 import keyring
 import keyring.errors as keyring_errors
 
-_CONFIG_DIR = Path.home() / ".config" / "dxscraper"
+def _resolve_config_dir() -> Path:
+    """Config directory, overridable via ``DXPEDITION_CONFIG_DIR`` (tests)."""
+    override = os.environ.get("DXPEDITION_CONFIG_DIR")
+    if override:
+        return Path(override)
+    return Path.home() / ".config" / "dxscraper"
+
+
+_CONFIG_DIR = _resolve_config_dir()
 _CONFIG_FILE = _CONFIG_DIR / "dxscraper_config.json"
 _KEYRING_SERVICE = "dxscraper"
 _KEYRING_USER = "qrz_token"
@@ -132,8 +140,14 @@ def get_last_sync() -> Optional[str]:
 
 def save_last_sync(timestamp: str):
     _ensure_config_file()
-    data = get_qrz_data()
+    try:
+        data = json.loads(_CONFIG_FILE.read_text())
+    except (json.JSONDecodeError, FileNotFoundError):
+        data = {}
     data["last_sync"] = timestamp
+    # The token lives in the keyring only; never persist it to the config file.
+    data.pop("token", None)
+    data.pop("keyring_unavailable", None)
     try:
         _atomic_write_config(data)
     except Exception as e:

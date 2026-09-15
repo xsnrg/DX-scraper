@@ -655,3 +655,46 @@ class TestSyncQSOData:
         assert result['status'] == 'ok'
         assert result['synced_count'] == 1
         mock_save.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_repeated_sync_does_not_duplicate_cache(self, mock_cache):
+        adif = (
+            '<call>AB1CD</call><time_on>143000</time_on><qso_date>20240115</qso_date><EOR>'
+            '<call>XY9ZZ</call><time_on>150000</time_on><qso_date>20240116</qso_date><EOR>'
+        )
+        with patch('src.qrz_qso._authenticate', new_callable=AsyncMock, return_value='tok'), \
+             patch('src.qrz_qso._fetch_qso_xml', new_callable=AsyncMock, return_value=adif), \
+             patch('src.qrz_qso.get_last_sync', return_value=None), \
+             patch('src.qrz_qso.save_last_sync'):
+            result1 = await sync_qso_data('AB1CD', 'tok')
+            result2 = await sync_qso_data('AB1CD', 'tok')
+        assert result1['status'] == 'ok'
+        assert result2['status'] == 'ok'
+        assert result1['total_qsos'] == 2
+        assert result2['total_qsos'] == 2
+        assert result2['synced_count'] == 2
+        lines = [l for l in mock_cache.read_text().splitlines() if l.strip()]
+        assert len(lines) == 2
+
+    @pytest.mark.asyncio
+    async def test_refetched_record_overwrites_cached_status(self, mock_cache):
+        stale = QSORecord(call='AB1CD', time_on='2024-01-15T14:30', freq='14.074',
+                          app_qrzlog_status='')
+        _write_cache([stale], is_full=True)
+
+        adif = (
+            '<call>AB1CD</call><time_on>1430</time_on><qso_date>20240115</qso_date>'
+            '<freq>14.074</freq><app_qrzlog_status>C</app_qrzlog_status><EOR>'
+        )
+        with patch('src.qrz_qso._authenticate', new_callable=AsyncMock, return_value='tok'), \
+             patch('src.qrz_qso._fetch_qso_xml', new_callable=AsyncMock, return_value=adif), \
+             patch('src.qrz_qso.get_last_sync', return_value='2024-01-15T09:00:00+00:00'), \
+             patch('src.qrz_qso.save_last_sync'):
+            result = await sync_qso_data('AB1CD', 'tok')
+        assert result['status'] == 'ok'
+        assert result['total_qsos'] == 1
+        lines = [l for l in mock_cache.read_text().splitlines() if l.strip()]
+        assert len(lines) == 1
+        rec = json.loads(lines[0])
+        assert rec['call'] == 'AB1CD'
+        assert rec['app_qrzlog_status'] == 'C'

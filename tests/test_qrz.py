@@ -1,6 +1,31 @@
 from playwright.sync_api import Page, expect
 
-from conftest import _mock_data, open_dashboard, qrz_ready_kwargs
+from conftest import (
+    DASHBOARD_URL,
+    _mock_data,
+    open_dashboard,
+    qrz_ready_kwargs,
+    stub_dashboard,
+)
+
+
+def test_qrz_token_save_shows_error(page: Page):
+    """A rejected token save surfaces the API error message in the modal."""
+    stub_dashboard(page)
+    page.route(
+        "**/qrz-token",
+        lambda route: route.fulfill(
+            status=422,
+            content_type="application/json",
+            body='{"detail": "Token validation failed"}',
+        ),
+    )
+    page.goto(DASHBOARD_URL)
+    page.get_by_role("button", name="Setup QRZ").click()
+    page.fill('input[placeholder*="AB1CD"]', "AB1CD")
+    page.fill('input[placeholder*="API token"]', "badtoken")
+    page.get_by_role("button", name="Save", exact=True).click()
+    expect(page.locator("#qrz-save-error")).to_contain_text("Token validation failed")
 
 
 def test_setup_qrz_button_visible_without_credentials(page: Page):

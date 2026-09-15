@@ -574,8 +574,9 @@ class TestMultipleSpotsPerCallsign:
 
 class TestDatetimeAndActive:
     def test_filter_by_age_accepts_naive_datetime(self, service):
-        naive_recent = datetime.now()
-        naive_old = datetime.now() - timedelta(hours=5)
+        naive_now = datetime.now(timezone.utc).replace(tzinfo=None)
+        naive_recent = naive_now
+        naive_old = naive_now - timedelta(hours=5)
         stations = [
             DXStation(callsign="NEW1", source="Test", last_update=naive_recent),
             DXStation(callsign="OLD1", source="Test", last_update=naive_old),

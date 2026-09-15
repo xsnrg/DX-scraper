@@ -60,7 +60,7 @@ class TestBaseFetcher:
         assert base_fetcher.validate_age(last_update) is False
 
     def test_validate_age_naive_datetime_treated_as_utc(self, base_fetcher):
-        last_update = datetime.now() - timedelta(seconds=100)
+        last_update = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=100)
         assert last_update.tzinfo is None
         assert base_fetcher.validate_age(last_update) is True
 

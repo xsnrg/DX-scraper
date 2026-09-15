@@ -237,7 +237,7 @@
             const country = allCountries.find(c => c.name === countryName);
             if (country) {
                 map.setView(country.center, 4);
-                const layer = countryLayers[countryName];
+                const layer = countryLayers[country.dxcc];
                 if (layer) {
                     layer.setRadius(10);
                     setTimeout(() => layer.setRadius(6), 2000);

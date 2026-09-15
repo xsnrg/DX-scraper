@@ -238,3 +238,20 @@ class TestQrzCacheEndpoints:
         assert set(first.keys()) == {
             "call", "country", "dxcc", "app_qrzlog_status", "time_on", "freq", "mode"
         }
+
+
+class TestResolveServerConfigDir:
+    def test_override_honored(self, tmp_path):
+        import conftest
+
+        resolved = conftest.resolve_server_config_dir(
+            {"DXPEDITION_CONFIG_DIR": str(tmp_path)}
+        )
+        assert resolved == tmp_path
+
+    def test_default_is_home_config_dir(self, tmp_path, monkeypatch):
+        import conftest
+
+        monkeypatch.setattr(conftest.Path, "home", classmethod(lambda cls: tmp_path))
+        resolved = conftest.resolve_server_config_dir({})
+        assert resolved == tmp_path / ".config" / "dxscraper"

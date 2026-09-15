@@ -188,3 +188,31 @@ class TestExceptionHierarchy:
         assert issubclass(QRZKeyringError, QRZConfigError)
         err = QRZKeyringError("no backend")
         assert "no backend" in str(err)
+
+
+class TestSaveLastSyncSecretSafety:
+    def test_token_never_written_to_config(self, isolated_config):
+        _dir, config_file = isolated_config
+        config_file.write_text(json.dumps({"callsign": "W1AW"}))
+        with patch("src.qrz_config.keyring.get_password", return_value="super-secret-token"):
+            save_last_sync("2024-01-01T00:00:00+00:00")
+        data = json.loads(config_file.read_text())
+        assert data["last_sync"] == "2024-01-01T00:00:00+00:00"
+        assert data["callsign"] == "W1AW"
+        assert "token" not in data
+        assert "keyring_unavailable" not in data
+
+
+class TestResolveConfigDir:
+    def test_env_override(self, monkeypatch, tmp_path):
+        from src.qrz_config import _resolve_config_dir
+        monkeypatch.setenv("DXPEDITION_CONFIG_DIR", str(tmp_path / "custom"))
+        assert _resolve_config_dir() == tmp_path / "custom"
+
+    def test_default_is_home_config(self, monkeypatch, tmp_path):
+        from pathlib import Path
+
+        from src.qrz_config import _resolve_config_dir
+        monkeypatch.delenv("DXPEDITION_CONFIG_DIR", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        assert _resolve_config_dir() == tmp_path / ".config" / "dxscraper"

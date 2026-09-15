@@ -83,3 +83,21 @@ def test_map_back_to_dashboard(page: Page):
     """Map page has a link back to the dashboard."""
     page.goto(f"{DASHBOARD_URL}/dxcc-map.html")
     expect(page.get_by_role("link", name="DX Monitor")).to_be_visible()
+
+
+def test_clicking_country_focuses_marker(page: Page):
+    """focusCountry highlights the country's marker (regression: layer lookup
+    must be keyed by DXCC number, not country name)."""
+    page.goto(f"{DASHBOARD_URL}/dxcc-map.html")
+    # Layers are only added after init()'s async QSO fetch resolves, so wait
+    # for them instead of just allCountries (which is set synchronously).
+    page.wait_for_function(
+        "typeof allCountries !== 'undefined' && allCountries.length > 0"
+        " && typeof countryLayers !== 'undefined'"
+        " && Object.keys(countryLayers).length === allCountries.length"
+    )
+    radius = page.evaluate(
+        "() => { const c = allCountries[0]; focusCountry(c.name);"
+        " return countryLayers[c.dxcc].options.radius; }"
+    )
+    assert radius == 10

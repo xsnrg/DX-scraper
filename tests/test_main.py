@@ -353,3 +353,27 @@ class TestResolveSourceName:
         assert resolve_source_name("DX Summit") == "DX Summit"
 
 
+
+
+class TestStdoutPurity:
+    """Log output must never pollute stdout (breaks --format json pipelines)."""
+
+    def test_logging_does_not_write_to_stdout(self, tmp_path):
+        import subprocess
+        import sys
+
+        code = (
+            "import logging\n"
+            "import src.main\n"
+            "logging.getLogger('qa.probe').warning('LOG-MARKER-XYZ')\n"
+            "print('STDOUT-ONLY')\n"
+        )
+        import os
+        env = dict(os.environ, PYTHONPATH=os.getcwd(),
+                   DXPEDITION_CONFIG_DIR=str(tmp_path))
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True, text=True, timeout=60, env=env,
+        )
+        assert result.stdout.strip() == "STDOUT-ONLY"
+        assert "LOG-MARKER-XYZ" in result.stderr

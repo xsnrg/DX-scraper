@@ -304,6 +304,7 @@
                                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
                     </div>
                 </div>
+                <p v-if="qrzSaveError" class="text-red-400 text-sm mt-3" id="qrz-save-error">{{ qrzSaveError }}</p>
                 <div class="flex gap-3 mt-6 justify-end">
                     <button @click="closeModal" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">
                         Cancel
@@ -317,7 +318,7 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted, onBeforeUnmount } = Vue;
+        const { createApp, ref, computed, onMounted, onBeforeUnmount, watch } = Vue;
 
         createApp({
             setup() {
@@ -330,6 +331,11 @@
                 const pageSize = ref(25);
                 const maxAgeMinutes = ref(30);
                 const currentPage = ref(1);
+                const qrzSaveError = ref('');
+
+                watch([searchQuery, maxAgeMinutes, pageSize], () => {
+                    currentPage.value = 1;
+                });
                 const showModal = ref(false);
                 const saving = ref(false);
                 const qrzCallsign = ref('');
@@ -652,10 +658,6 @@
                 onMounted(checkQrzStatus);
                 onMounted(loadQrzCache);
 
-                onMounted(fetchData);
-                onMounted(checkQrzStatus);
-                onMounted(loadQrzCache);
-
                 const showQrzModal = () => {
                     showModal.value = true;
                     showCallsignField.value = true;
@@ -663,6 +665,7 @@
                     qrzCallsign.value = '';
                     qrzToken.value = '';
                     needsRenewal.value = false;
+                    qrzSaveError.value = '';
                     checkQrzStatus().then(() => {
                         if (qrzReady.value) {
                             fetch('/qrz-status').then(r => r.json()).then(data => {
@@ -681,6 +684,7 @@
 
                 const saveQrzToken = async () => {
                     saving.value = true;
+                    qrzSaveError.value = '';
                     try {
                         const resp = await fetch('/qrz-token', {
                             method: 'POST',
@@ -696,12 +700,11 @@
                         }
                         qrzReady.value = true;
                         closeModal();
-                        await loadQrzCache();
                         const syncResp = await fetch('/qrz-sync');
                         const syncData = await syncResp.json();
                         if (syncData.status === 'ok') {
                             syncStatus.value = 'success';
-                            qrzCacheInfo.value.last_modified = new Date().toISOString();
+                            await loadQrzCache();
                             clearTimeout(syncTimeout);
                             syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
                         } else {
@@ -710,6 +713,7 @@
                             syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 3000);
                         }
                     } catch (e) {
+                        qrzSaveError.value = e.message || 'Failed to save token';
                     } finally {
                         saving.value = false;
                     }
@@ -728,7 +732,6 @@
                         if (data.status === 'ok') {
                             syncStatus.value = 'success';
                             await loadQrzCache();
-                            qrzCacheInfo.value.last_modified = new Date().toISOString();
                             clearTimeout(syncTimeout);
                             syncTimeout = setTimeout(() => { syncStatus.value = 'idle'; }, 2000);
                         } else if (data.needs_renewal) {
@@ -754,7 +757,7 @@
                     sortKey, sortOrder, pageSize, maxAgeMinutes, currentPage,
                     columns, filteredStations, paginatedStations,
                     fetchData, setSort, formatDate, countdownText,
-                    showModal, showQrzModal, closeModal, saveQrzToken,
+                    showModal, showQrzModal, closeModal, saveQrzToken, qrzSaveError,
                     saving, qrzCallsign, qrzToken, qrzReady,
                     showCallsignField, showTokenField,
                     syncStatus, syncQrzData, needsRenewal,

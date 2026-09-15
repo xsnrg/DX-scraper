@@ -1,8 +1,7 @@
 import json
 import pytest
-from pathlib import Path
 from playwright.sync_api import Page, expect
-from conftest import DASHBOARD_URL, _mock_data, open_dashboard
+from conftest import DASHBOARD_URL, _mock_data, open_dashboard, resolve_server_config_dir
 
 
 def test_data_api_returns_json(page: Page):
@@ -55,8 +54,9 @@ def test_qrz_cache_api(page: Page):
 
 def test_qrz_cache_confirmed_only(page: Page, mocker):
     """The /qrz-cache API returns only confirmed QSOs with correct band mapping."""
-    # Write to the actual cache file that the server reads
-    cache_dir = Path.home() / ".config" / "dxscraper"
+    # Write to the actual cache file that the server reads (honoring the
+    # DXPEDITION_CONFIG_DIR override the server may have been started with).
+    cache_dir = resolve_server_config_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
     temp_cache = cache_dir / "dxscraper_qso.jsonl"
 
