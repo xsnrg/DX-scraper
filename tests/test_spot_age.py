@@ -11,10 +11,10 @@ def _aged_mock():
     return mock
 
 
-def test_spot_age_filter_default_is_30(page: Page):
-    """Spot age filter shows 30 as default on page load."""
+def test_spot_age_filter_default_is_20(page: Page):
+    """Spot age filter shows 20 as default on page load."""
     open_dashboard(page, _aged_mock())
-    expect(page.get_by_role("combobox").last).to_have_value("30")
+    expect(page.get_by_role("combobox").last).to_have_value("20")
 
 
 def test_spot_age_filter_options(page: Page):
@@ -29,15 +29,16 @@ def test_spot_age_filter_options(page: Page):
 def test_spot_age_filter_hides_spots_older_than_selected(page: Page):
     """Changing the spot-age cutoff actually filters table rows."""
     open_dashboard(page, _aged_mock())
-    # Default 30 min: 5 and 25 stay, 45 and 90 drop.
+    # Default 20 min: 5 stays, 25, 45 and 90 drop.
     expect(page.get_by_role("cell", name="W1AW")).to_be_visible()
-    expect(page.get_by_role("cell", name="VK3EPR")).to_be_visible()
+    expect(page.get_by_role("cell", name="VK3EPR")).not_to_be_visible()
     expect(page.get_by_role("cell", name="P29V")).not_to_be_visible()
     expect(page.get_by_role("cell", name="ZS6DX")).not_to_be_visible()
 
-    page.get_by_role("combobox").last.select_option("10")
+    page.get_by_role("combobox").last.select_option("30")
     expect(page.get_by_role("cell", name="W1AW")).to_be_visible()
-    expect(page.get_by_role("cell", name="VK3EPR")).not_to_be_visible()
+    expect(page.get_by_role("cell", name="VK3EPR")).to_be_visible()
+    expect(page.get_by_role("cell", name="P29V")).not_to_be_visible()
 
     page.get_by_role("combobox").last.select_option("60")
     expect(page.get_by_role("cell", name="W1AW")).to_be_visible()
