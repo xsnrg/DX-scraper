@@ -20,3 +20,6 @@ Thumbs.db
 
 **/mcpServers
 .playwright-mcp
+
+# Runtime junk
+nohup.out
