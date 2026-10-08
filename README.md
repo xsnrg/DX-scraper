@@ -11,6 +11,7 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 - **Multi-source aggregation** — DX Summit, Spothole (DX Cluster), HamQTH, POTA, and NG3K. Live spots are kept per callsign + band + mode so a DXpedition running several stations appears as several rows; duplicate reports of the same station are still merged
 - **Potential spots** — NG3K announced DXpeditions that are scheduled to be QRV *today* appear as rows with a yellow `potential` marker and `not spotted` in Updated. Live spots always win; QRZ / Wanted / search still apply; spot-age does not hide them
 - **Real-time dashboard** — Vue 3 + Tailwind UI with auto-refresh, sortable columns, pagination, and a Local/UTC time slider
+- **Responsive layout** — columns scale proportionally with the window, headers wrap at spaces but never split words, and the page never scrolls horizontally; a Normal/Wide slider switches between a capped and a full-width layout
 - **QRZ logbook** — Import your QRZ.com log to hide confirmed QSOs and highlight needed DXCC. Token lives in the OS keyring, not on disk
 - **Wanted filter** — Three-way toggle: off → highlight needed DXCC in red → show only needed DXCC
 - **QRZ filter** — Hide callsigns already confirmed on that band
@@ -94,10 +95,12 @@ Dashboard: [http://localhost:8000](http://localhost:8000).
 `pytest.ini` sets `asyncio_mode = auto` and `pythonpath = .`. Markers are applied automatically: Playwright UI tests are `acceptance` (need the API on port 8000); everything else is `unit`.
 
 ```bash
-pytest -m "not acceptance"   # unit tests (~324)
-pytest -m acceptance         # UI tests (~82); start ./run_web.sh first
+pytest -m "not acceptance"   # unit tests (~368)
+pytest -m acceptance         # UI tests (~164); start ./run_web.sh first
 pytest tests/test_ng3k.py -v
 ```
+
+Layout contracts live in dedicated acceptance suites: `test_header_words.py` (headers never split words mid-line), `test_vertical_viewport.py` (table never clipped or height-capped; rows limited only by the page-size selection), `test_utc_toggle.py` and `test_wide_toggle.py` (slider click/drag/persistence behavior).
 
 ## API endpoints
 
@@ -125,7 +128,7 @@ All timestamps stored and compared by the application are UTC:
 - QRZ cache `last_modified` is formatted from file mtime as UTC
 - CLI JSON uses ISO-8601 with a `Z` suffix; table output is labeled UTC
 - Docker images set `TZ=UTC`
-- The dashboard slider at the top of the page switches displayed times between UTC (default) and the browser's local timezone; the choice is stored in `localStorage` as `displayUtc`
+- The dashboard slider at the top of the page switches displayed times between UTC (default) and the browser's local timezone; the choice is stored in `localStorage` as `displayUtc`. Clicking the slider thumb (or either end of the track) toggles it — no dragging required
 
 ## Configuration
 

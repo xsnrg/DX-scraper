@@ -121,6 +121,22 @@ def open_dashboard(page, data=None, **kwargs):
     page.goto(DASHBOARD_URL)
 
 
+def open_dashboard_mode(page, wide, data=None, **kwargs):
+    """Open the dashboard in normal (wide=False) or wide (wide=True) layout.
+
+    The layout preference lives in localStorage and is read on app start, so
+    the page is loaded once, the key is set, and the page is reloaded. Route
+    stubs survive the reload.
+    """
+    open_dashboard(page, data=data, **kwargs)
+    page.wait_for_selector("table tbody tr")
+    page.evaluate(
+        "() => localStorage.setItem('wideMode', %s)" % ("true" if wide else "false")
+    )
+    page.reload()
+    page.wait_for_selector("table tbody tr")
+
+
 def qrz_ready_kwargs(dxcc_numbers=None, cache_data=None, all_data=None, callsign="TEST"):
     """QRZ stubs for tests that need credentials + a populated cache."""
     cache_data = cache_data if cache_data is not None else [["W1AW", "40M", "291"]]

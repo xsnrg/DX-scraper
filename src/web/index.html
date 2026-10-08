@@ -42,21 +42,40 @@
         .tz-slider.utc-on {
             background: #2563eb;
         }
+        .tz-slider.wide-on {
+            background: #7c3aed;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
-    <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
-        <!-- Timezone display toggle -->
-        <div class="mb-4 flex items-center justify-end gap-3 text-sm text-slate-300" id="tz-toggle-bar">
+    <div id="app" v-cloak>
+    <!-- Layout width wrapper (bindings on the #app mount root are not compiled) -->
+    <div class="p-4 md:p-8 mx-auto" :class="wideMode ? 'w-full' : 'max-w-7xl'">
+        <!-- Timezone / layout width toggles -->
+        <div class="mb-4 flex flex-wrap items-center justify-end gap-3 text-sm text-slate-300" id="tz-toggle-bar">
             <span :class="displayUtc ? 'text-slate-500' : 'text-slate-100 font-semibold'">Local</span>
             <input type="range" min="0" max="1" step="1"
                    class="tz-slider"
                    :class="{ 'utc-on': displayUtc }"
                    :value="displayUtc ? 1 : 0"
                    @input="setDisplayUtc($event.target.value === '1')"
+                   @pointerdown="rememberSlider"
+                   @click="sliderActivate($event, displayUtc, setDisplayUtc)"
                    aria-label="Toggle between local browser time and UTC"
                    id="tz-slider">
             <span :class="displayUtc ? 'text-blue-300 font-semibold' : 'text-slate-500'">UTC</span>
+            <span class="mx-2 text-slate-600" aria-hidden="true">|</span>
+            <span :class="wideMode ? 'text-slate-500' : 'text-slate-100 font-semibold'">Normal</span>
+            <input type="range" min="0" max="1" step="1"
+                   class="tz-slider"
+                   :class="{ 'wide-on': wideMode }"
+                   :value="wideMode ? 1 : 0"
+                   @input="setWideMode($event.target.value === '1')"
+                   @pointerdown="rememberSlider"
+                   @click="sliderActivate($event, wideMode, setWideMode)"
+                   aria-label="Toggle page width between normal and wide"
+                   id="wide-slider">
+            <span :class="wideMode ? 'text-violet-300 font-semibold' : 'text-slate-500'">Wide</span>
         </div>
 
         <!-- Header Section -->
@@ -67,7 +86,7 @@
                 </a>
                 <p class="text-slate-400 mt-1">Tracking of active DX spots</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center justify-center gap-3">
                 <div class="flex flex-col items-center">
                     <button @click="togglePota"
                             :class="potaEnabled ? 'bg-purple-600 hover:bg-purple-700' : 'bg-slate-600 hover:bg-slate-700'"
@@ -182,9 +201,9 @@
                 <table class="w-full table-fixed text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-700/50 text-slate-300 text-sm uppercase">
-                            <th v-for="col in columns" :key="col.key" :style="col.width ? { width: col.width, minWidth: col.width } : {}" 
+                            <th v-for="col in columns" :key="col.key" :style="col.width ? { width: col.width } : {}" 
                                 @click="setSort(col.key)"
-                                class="px-6 py-4 cursor-pointer hover:bg-slate-600 transition-colors break-words"
+                                class="px-4 py-4 align-top whitespace-normal cursor-pointer hover:bg-slate-600 transition-colors"
                                 :class="{'text-blue-400 font-bold': sortKey === col.key, 'sort-asc': sortKey === col.key && sortOrder === 1, 'sort-desc': sortKey === col.key && sortOrder === -1}">
                                 {{ col.label }}
                             </th>
@@ -194,7 +213,7 @@
                         <tr v-for="station in paginatedStations" :key="[station.callsign, station.band, station.mode, station.frequency, station.pota_reference, station.potential].join('|')" 
                             class="hover:bg-slate-700/30 transition-colors"
                             :class="getQrzRowClass(station)">
-                            <td class="px-6 py-4 font-mono font-bold text-blue-300">
+                            <td class="px-4 py-4 font-mono font-bold text-blue-300">
                                 <div class="flex flex-col items-start gap-1">
                                     <a :href="`https://www.qrz.com/db/${station.callsign}`" target="_blank" class="hover:text-blue-400 hover:underline transition-colors">
                                         {{ station.callsign }}
@@ -205,7 +224,7 @@
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 py-4">
                                 <template v-if="station.pota_reference">
                                     <a :href="`https://pota.app/#/park/${station.pota_reference}`" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
                                         <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.dx_country : station.dx_country" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.dx_country }}</span>
@@ -215,20 +234,20 @@
                                     <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.dx_country : station.dx_country" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.dx_country }}</span>
                                 </template>
                             </td>
-                            <td class="px-6 py-4 text-xs font-mono text-slate-500">{{ station.dxcc || '-' }}</td>
-                            <td class="px-6 py-4">{{ station.spotter_country || station.spotter }}</td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 py-4 text-xs font-mono text-slate-500">{{ station.dxcc || '-' }}</td>
+                            <td class="px-4 py-4">{{ station.spotter_country || station.spotter }}</td>
+                            <td class="px-4 py-4">
                                 <span @click="searchQuery = searchQuery ? searchQuery + ',' + station.band : station.band" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.band }}</span>
                             </td>
-                            <td class="px-6 py-4 text-sm font-mono" style="width: 160px;">
+                            <td class="px-4 py-4 text-sm font-mono">
                                 {{ station.frequency ? station.frequency.toFixed(4) + ' MHz' : '—' }}
                             </td>
-                            <td class="px-6 py-4 break-words">
+                            <td class="px-4 py-4 break-words">
                                 <span v-if="station.mode" @click="searchQuery = searchQuery ? searchQuery + ',' + station.mode : station.mode" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.mode }}</span>
                                 <span v-else-if="station.comment" @click="searchQuery = searchQuery ? searchQuery + ',' + station.comment : station.comment" class="cursor-pointer hover:text-blue-400 hover:underline transition-colors">{{ station.comment }}</span>
                                 <span v-else>-</span>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-400 break-words">{{ station.potential ? 'not spotted' : formatDate(station.last_update) }}</td>
+                            <td class="px-4 py-4 text-sm text-slate-400 break-words">{{ station.potential ? 'not spotted' : formatDate(station.last_update) }}</td>
                             <td class="px-3 py-4 align-middle">
                                 <div class="flex flex-wrap items-center gap-1 min-w-0" :title="(station.sources && station.sources.length ? station.sources : [station.source]).join(', ')">
                                     <a v-for="src in (station.sources && station.sources.length ? station.sources : [station.source])"
@@ -253,7 +272,7 @@
             </div>
 
             <!-- Pagination -->
-            <div class="px-6 py-4 bg-slate-700/30 border-t border-slate-700 flex items-center justify-between">
+            <div class="px-4 py-4 bg-slate-700/30 border-t border-slate-700 flex items-center justify-between">
                 <div class="text-sm text-slate-400">
                     Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, filteredStations.length) }} of {{ filteredStations.length }} entries
                 </div>
@@ -316,6 +335,7 @@
             </div>
         </div>
     </div>
+    </div>
 
     <script>
         const { createApp, ref, computed, onMounted, onBeforeUnmount, watch } = Vue;
@@ -356,10 +376,38 @@
                 const qrzConfirmedDxccNumbers = ref(new Set());
                 const wantedMode = ref(parseInt(localStorage.getItem('wantedMode') || '0'));
                 const displayUtc = ref(localStorage.getItem('displayUtc') !== 'false');
+                const wideMode = ref(localStorage.getItem('wideMode') === 'true');
 
                 const setDisplayUtc = (enabled) => {
                     displayUtc.value = !!enabled;
                     localStorage.setItem('displayUtc', displayUtc.value.toString());
+                };
+
+                const setWideMode = (enabled) => {
+                    wideMode.value = !!enabled;
+                    localStorage.setItem('wideMode', wideMode.value.toString());
+                };
+
+                // Range sliders never fire `input` when the thumb itself is
+                // clicked, and some browsers do not jump to track clicks.
+                // Remember the pre-click value so `click` can tell whether the
+                // browser already handled the interaction.
+                const rememberSlider = (e) => {
+                    e.target.dataset.startValue = e.target.value;
+                };
+
+                const sliderActivate = (e, isEnabled, setter) => {
+                    if (e.target.value !== e.target.dataset.startValue) return; // handled natively
+                    const rect = e.target.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const thumbZone = rect.width * 0.42; // thumb is ~1.15rem of a 2.75rem track
+                    const onThumb = (isEnabled && x > rect.width - thumbZone) ||
+                                    (!isEnabled && x < thumbZone);
+                    if (onThumb) {
+                        setter(!isEnabled);
+                    } else {
+                        setter(x > rect.width / 2);
+                    }
                 };
 
                 const loadQrzCache = async () => {
@@ -480,16 +528,18 @@
                     }
                 };
 
+                // Widths are percentages so columns scale proportionately with the
+                // container (see the Wide layout toggle). They must sum to 100.
                 const columns = [
-                    { key: 'callsign', label: 'DX Callsign' },
-                    { key: 'dx_country', label: 'DX Location' },
-                    { key: 'dxcc', label: 'DXCC' },
-                    { key: 'spotter_country', label: 'Spotter' },
-                    { key: 'band', label: 'Band' },
-                    { key: 'frequency', label: 'Frequency', width: '160px' },
-                    { key: 'mode', label: 'Mode/Comment', width: '8rem' },
-                    { key: 'last_update', label: 'Updated', width: '9rem' },
-                    { key: 'source', label: 'Source', width: '14rem' },
+                    { key: 'callsign', label: 'DX Callsign', width: '10%' },
+                    { key: 'dx_country', label: 'DX Location', width: '12%' },
+                    { key: 'dxcc', label: 'DXCC', width: '7%' },
+                    { key: 'spotter_country', label: 'Spotter', width: '8%' },
+                    { key: 'band', label: 'Band', width: '6%' },
+                    { key: 'frequency', label: 'Frequency', width: '11%' },
+                    { key: 'mode', label: 'Mode/Comment', width: '12%' },
+                    { key: 'last_update', label: 'Updated', width: '13%' },
+                    { key: 'source', label: 'Source', width: '21%' },
                 ];
 
                 const SOURCE_LOOKUP = {
@@ -765,6 +815,7 @@
                     getQrzRowClass, nextRefreshTime, potaEnabled, togglePota,
                     wantedMode, toggleWanted,
                     displayUtc, setDisplayUtc,
+                    wideMode, setWideMode, rememberSlider, sliderActivate,
                     sourceUrl,
                 };
             }
