@@ -205,7 +205,7 @@
                                 @click="setSort(col.key)"
                                 class="px-4 py-4 align-top whitespace-normal cursor-pointer hover:bg-slate-600 transition-colors"
                                 :class="{'text-blue-400 font-bold': sortKey === col.key, 'sort-asc': sortKey === col.key && sortOrder === 1, 'sort-desc': sortKey === col.key && sortOrder === -1}">
-                                {{ col.label }}
+                                <template v-for="(part, pi) in col.parts" :key="pi"><span>{{ part }}</span><wbr v-if="pi < col.parts.length - 1"></template>
                             </th>
                         </tr>
                     </thead>
@@ -338,7 +338,7 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted, onBeforeUnmount, watch } = Vue;
+        const { createApp, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } = Vue;
 
         createApp({
             setup() {
@@ -530,6 +530,8 @@
 
                 // Widths are percentages so columns scale proportionately with the
                 // container (see the Wide layout toggle). They must sum to 100.
+                // `parts` splits labels after '/' so headers can also break there
+                // (<wbr>), keeping every unbreakable token short in any font.
                 const columns = [
                     { key: 'callsign', label: 'DX Callsign', width: '10%' },
                     { key: 'dx_country', label: 'DX Location', width: '12%' },
@@ -540,7 +542,10 @@
                     { key: 'mode', label: 'Mode/Comment', width: '13%' },
                     { key: 'last_update', label: 'Updated', width: '13%' },
                     { key: 'source', label: 'Source', width: '20%' },
-                ];
+                ].map((col) => ({
+                    ...col,
+                    parts: col.label.split('/').map((p, i, a) => (i < a.length - 1 ? p + '/' : p)),
+                }));
 
                 const SOURCE_LOOKUP = {
                     'DX Summit': (call) => `http://www.dxsummit.fi/#/?dx_calls=${encodeURIComponent(call)}`,
@@ -707,6 +712,26 @@
                 onMounted(fetchData);
                 onMounted(checkQrzStatus);
                 onMounted(loadQrzCache);
+
+                // Font-metric-independent header fit. Percentage widths cannot
+                // anticipate how wide every font renders, so after the table
+                // renders (and whenever it re-renders or resizes) measure each
+                // header and shrink its font slightly until it fits its cell.
+                // Whitespace + <wbr> break points handle normal cases; this
+                // guarantees no font can ever overflow a header.
+                const fitHeaders = () => {
+                    document.querySelectorAll('thead th').forEach((th) => {
+                        th.style.fontSize = '';
+                        let scale = 100;
+                        while (th.scrollWidth > th.clientWidth && scale > 60) {
+                            scale -= 5;
+                            th.style.fontSize = scale + '%';
+                        }
+                    });
+                };
+                watch([summary, sortKey], () => nextTick(fitHeaders));
+                onMounted(() => window.addEventListener('resize', fitHeaders));
+                onBeforeUnmount(() => window.removeEventListener('resize', fitHeaders));
 
                 const showQrzModal = () => {
                     showModal.value = true;

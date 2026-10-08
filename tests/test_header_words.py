@@ -26,23 +26,36 @@ COLUMNS = [
 
 # A line break is a mid-word split when the last visible char of one line and
 # the first visible char of the next are adjacent in the source text (no space
-# between them). The line-break-only-at-spaces contract is checked per char.
+# between them) and the break is not after an explicit separator ('/'), which
+# the app marks as a legal break point with <wbr>. Headers may contain several
+# text nodes (one span per '/'-separated part), so all nodes are joined and
+# measured through a (node, offset) index.
 HEADER_REPORT_JS = """
 () => [...document.querySelectorAll('thead th')].map(th => {
+    const nodes = [];
     const walker = document.createTreeWalker(th, NodeFilter.SHOW_TEXT);
-    let node = null;
+    let off = 0;
     while (walker.nextNode()) {
-        if (walker.currentNode.data.trim().length) { node = walker.currentNode; break; }
+        const n = walker.currentNode;
+        if (n.data.length) { nodes.push({ n, base: off }); off += n.data.length; }
     }
-    const data = node ? node.data : '';
+    const data = nodes.map(x => x.n.data).join('');
     const range = document.createRange();
+    const rectAt = (idx) => {
+        for (const x of nodes) {
+            if (idx >= x.base && idx < x.base + x.n.data.length) {
+                range.setStart(x.n, idx - x.base);
+                range.setEnd(x.n, idx - x.base + 1);
+                return range.getBoundingClientRect();
+            }
+        }
+        return null;
+    };
     const visible = [];
     for (let i = 0; i < data.length; i++) {
         if (!data[i].trim()) continue;
-        range.setStart(node, i);
-        range.setEnd(node, i + 1);
-        const r = range.getBoundingClientRect();
-        if (r.width < 0.5) continue;
+        const r = rectAt(i);
+        if (!r || r.width < 0.5) continue;
         visible.push({ i, ch: data[i], top: r.top, right: r.right });
     }
     const lines = [];
@@ -60,10 +73,9 @@ HEADER_REPORT_JS = """
     }
     const midWordSplits = [];
     for (let k = 1; k < lines.length; k++) {
-        if (lines[k].firstIdx === lines[k - 1].lastIdx + 1) {
-            midWordSplits.push(
-                lines[k - 1].text + '|' + lines[k].text.slice(0, 1) + '...'
-            );
+        const prev = lines[k - 1], cur = lines[k];
+        if (cur.firstIdx === prev.lastIdx + 1 && !prev.text.endsWith('/')) {
+            midWordSplits.push(prev.text + '|' + cur.text.slice(0, 1) + '...');
         }
     }
     const cs = getComputedStyle(th);
@@ -170,3 +182,57 @@ def test_all_expected_headers_render(page: Page):
     expect(headers).to_have_count(len(COLUMNS))
     for i, name in enumerate(COLUMNS):
         expect(headers.nth(i)).to_have_text(name)
+
+
+def _stress_fonts(page, spacing):
+    """Render headers with wide glyphs (simulating a substituted font) and
+    trigger the app's resize refit."""
+    page.add_style_tag(content=f"thead th {{ letter-spacing: {spacing}; }}")
+    size = page.viewport_size
+    page.set_viewport_size({"width": size["width"] - 1, "height": size["height"]})
+    page.wait_for_timeout(150)
+
+
+def test_headers_fit_under_wide_font_stress(page: Page):
+    """Substitute fonts render text wider than the development font. Even with
+    glyphs inflated well beyond any realistic font swap, every header line
+    must stay inside its cell — via wrapping at spaces/'<wbr>' slashes and the
+    runtime header autofit, not via lucky percentage widths."""
+    page.set_viewport_size({"width": 1280, "height": 800})
+    open_dashboard_mode(page, False, _mock_data(num_stations=5))
+    _stress_fonts(page, "0.25em")
+    for th in _report(page):
+        assert th["lineMaxRight"] <= th["cellRight"] + 1, (
+            f"{th['label']}: overflowed cell under font stress "
+            f"({th['lineMaxRight']} > {th['cellRight']})"
+        )
+
+
+def test_headers_fit_under_extreme_font_stress(page: Page):
+    """Proves the autofit is actually working: at extreme glyph inflation the
+    only way headers can still fit is the runtime shrink (floored at 60%),
+    since no static percentage could accommodate this. Also asserts the page
+    still has no horizontal scrolling."""
+    page.set_viewport_size({"width": 1280, "height": 800})
+    open_dashboard_mode(page, False, _mock_data(num_stations=5))
+    _stress_fonts(page, "0.4em")
+    for th in _report(page):
+        assert th["lineMaxRight"] <= th["cellRight"] + 1, (
+            f"{th['label']}: overflowed cell under extreme font stress "
+            f"({th['lineMaxRight']} > {th['cellRight']})"
+        )
+    metrics = page.evaluate("""() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        inner: window.innerWidth,
+    })""")
+    assert metrics["scrollWidth"] <= metrics["inner"] + 1, metrics
+
+
+def test_no_midword_splits_under_font_stress(page: Page):
+    """Autofit and <wbr> breaks must not introduce mid-word splits: stressed
+    headers still break only at spaces or after slashes."""
+    page.set_viewport_size({"width": 1100, "height": 800})
+    open_dashboard_mode(page, False, _mock_data(num_stations=5))
+    _stress_fonts(page, "0.25em")
+    for th in _report(page):
+        assert th["midWordSplits"] == [], th["label"]
