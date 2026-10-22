@@ -1,6 +1,12 @@
+from pathlib import Path
+
 from playwright.sync_api import Page, expect
 
 from conftest import _mock_data, open_dashboard
+
+# NG3K's cgi-bin/adxo.pl index returns 0 hits for every query. The by-call
+# ADXO page is the working list; a text fragment highlights that call.
+NG3K_CALL_URL = "https://www.ng3k.com/Misc/adxoc.html#:~:text={}"
 
 
 def _assert_pills_fully_visible(source_cell, names, clip_container):
@@ -17,6 +23,16 @@ def _assert_pills_fully_visible(source_cell, names, clip_container):
         assert badge_box["y"] + badge_box["height"] <= cell_box["y"] + cell_box["height"] + 1, name
         assert badge_box["x"] + badge_box["width"] <= clip_box["x"] + clip_box["width"] + 1, name
         assert pill.evaluate("el => el.scrollWidth <= el.clientWidth + 1"), name
+
+
+def test_ng3k_source_lookup_targets_adxo_by_call_page():
+    """The NG3K pill opens the by-call ADXO page on this call, not the empty search."""
+    html = (Path(__file__).resolve().parents[1] / "src/web/index.html").read_text()
+    assert "adxo.pl?query=" not in html
+    assert (
+        "'NG3K': (call) => `https://www.ng3k.com/Misc/adxoc.html#:~:text=${encodeURIComponent(call)}`"
+        in html
+    )
 
 
 def test_data_table_has_correct_columns(page: Page):
@@ -145,9 +161,7 @@ def test_data_table_source_pills_link_to_source_with_callsign(page: Page):
     )
 
     ng3k = page.locator("table tbody tr").nth(1).locator("td").last.get_by_role("link", name="NG3K")
-    expect(ng3k).to_have_attribute(
-        "href", "https://www.ng3k.com/cgi-bin/adxo.pl?query=VK3EPR"
-    )
+    expect(ng3k).to_have_attribute("href", NG3K_CALL_URL.format("VK3EPR"))
     expect(ng3k).to_have_attribute("target", "_blank")
 
 
@@ -200,5 +214,5 @@ def test_data_table_source_pill_encodes_portable_callsign(page: Page):
         "href", f"https://pota.app/#/profile/{encoded}"
     )
     expect(cell.get_by_role("link", name="NG3K")).to_have_attribute(
-        "href", f"https://www.ng3k.com/cgi-bin/adxo.pl?query={encoded}"
+        "href", NG3K_CALL_URL.format(encoded)
     )

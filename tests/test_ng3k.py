@@ -110,6 +110,33 @@ class TestCallsignHelpers:
         assert place == "Canary Is"
         assert calls == []
 
+    def test_space_separated_as_calls_are_all_captured(self):
+        """'as T88FM T88MK T88XM' names three operating calls, not only the first."""
+        place, calls = extract_callsigns(
+            "Palau (T8)",
+            "By JM1LIG JO3LVG JG1LFF as T88FM T88MK T88XM fm Koror I (IOTA OC-009); HF",
+        )
+        assert place == "Palau"
+        assert calls == ["T88FM", "T88MK", "T88XM"]
+
+    def test_and_joins_operating_calls_after_one_as(self):
+        """'as 6W/I2YSB and 6W/IK2HKT' is two operations; the operators before 'as' are not."""
+        place, calls = extract_callsigns(
+            "Senegal (6W)",
+            "By IV3FSG I1FQH as 6W/I2YSB and 6W/IK2HKT; 160-6m; CW SSB",
+        )
+        assert place == "Senegal"
+        assert calls == ["6W/I2YSB", "6W/IK2HKT"]
+
+    def test_prefix_summary_is_not_duplicated_beside_portable_call(self):
+        """(VP2V) is the prefix; the station is VP2V/WE9G, not a second call."""
+        place, calls = extract_callsigns(
+            "Br Virgin Is (VP2V)",
+            "By WE9G as VP2V/WE9G fm Tortola; 160-6m",
+        )
+        assert place == "Br Virgin Is"
+        assert calls == ["VP2V/WE9G"]
+
 
 class TestCompactComment:
     def test_strips_dates_qsl_and_prose(self):

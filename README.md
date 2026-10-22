@@ -32,7 +32,7 @@ A live dashboard for ham-radio DX spots you have not already worked. It aggregat
 | `pota` | POTA | Park activations |
 | `ng3k` | NG3K | Today's announced operations as potential spots |
 
-Prefix-only NG3K calendar entries (`EA8`, `3B8`, …) are skipped unless the description names a real operating call (`as 3B8/SQ9UM`). Upcoming or expired operations are not shown.
+Prefix-only NG3K calendar entries (`EA8`, `3B8`, …) are skipped unless the description names a real operating call (`as 3B8/SQ9UM`). Several calls after one "as" (`as T88FM T88MK T88XM`) are all shown. A prefix that looks like a call (`VP2V`) is not listed again beside the portable call (`VP2V/WE9G`). Upcoming or expired operations are not shown.
 
 ## Architecture
 

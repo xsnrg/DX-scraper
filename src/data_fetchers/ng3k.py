@@ -2,7 +2,10 @@
 
 Only operations whose date window includes today, and only when a real
 callsign can be extracted. Prefix-only entries (EA8, FR, 3B8, …) are skipped
-unless the description names the operating call (`as 3B8/SQ9UM`).
+unless the description names the operating call (`as 3B8/SQ9UM`). Several
+calls after one "as" (`as T88FM T88MK T88XM`) are all kept. A parenthetical
+prefix that looks like a call (`VP2V`) is not also emitted next to the
+portable call (`as VP2V/WE9G`).
 """
 from __future__ import annotations
 
@@ -30,10 +33,9 @@ _FULL_CALL = re.compile(
 _PREFIX_ONLY = re.compile(
     r"^((?:[A-Z]{1,2}|\d[A-Z]{1,2})\d{1,4})$"
 )
-_AS_CALL = re.compile(
-    r"\bas\s+([A-Z0-9]{1,3}\d[A-Z0-9]{0,5}(?:/[A-Z0-9]{1,6})?)",
-    re.IGNORECASE,
-)
+# Call-like words, including portable PREFIX/CALL. A semicolon ends an "as"
+# clause; NG3K uses it before bands, QSL notes, and host stations (@J68HZ).
+_CALL_TOKEN = re.compile(r"[A-Za-z0-9]+(?:/[A-Za-z0-9]+)?|;")
 _SUMMARY = re.compile(r"^(.*?)\s*\(([^)]+)\)\s*$")
 _BANDS = re.compile(
     r"\b(?:\d+\s*-\s*\d+\s*m|\d+(?:\s+\d+)+\s*m|\d+\s*m|HF|VHF|UHF)\b",
@@ -90,6 +92,58 @@ def is_full_call(token: str) -> bool:
     return bool(_FULL_CALL.match(token))
 
 
+def _calls_after_as(description: str) -> list[str]:
+    """Operating calls introduced by 'as'.
+
+    One 'as' may name several stations, separated by spaces or 'and'
+    ('as T88FM T88MK T88XM', 'as 6W/I2YSB and 6W/IK2HKT'). The call in
+    'and W5RCX as V47RCX' is the operator, not an extra station.
+    """
+    tokens = _CALL_TOKEN.findall(description)
+    calls: list[str] = []
+    index = 0
+    count = len(tokens)
+    while index < count:
+        if tokens[index].lower() != "as":
+            index += 1
+            continue
+        index += 1
+        while index < count:
+            token = tokens[index]
+            if token == ";":
+                break
+            if token.lower() == "and":
+                index += 1
+                continue
+            candidate = token.upper()
+            if not is_full_call(candidate):
+                break
+            # "and W5RCX as V47RCX" — the call between "and" and "as" is the operator.
+            previous = tokens[index - 1].lower() if index else ""
+            if (
+                previous == "and"
+                and index + 1 < count
+                and tokens[index + 1].lower() == "as"
+            ):
+                break
+            if candidate not in calls:
+                calls.append(candidate)
+            index += 1
+    return calls
+
+
+def _summary_is_only_a_prefix(token: str, calls: list[str]) -> bool:
+    """True when the parenthetical is the prefix half of a portable call.
+
+    '(VP2V)' plus 'as VP2V/WE9G' is one operation, not a second callsign.
+    """
+    for call in calls:
+        left, slash, _right = call.partition("/")
+        if slash and left == token:
+            return True
+    return False
+
+
 def extract_callsigns(summary: str, description: str) -> tuple[str, list[str]]:
     """Return (place name, operating callsigns) for one calendar event."""
     summary = _unescape(summary or "").strip()
@@ -100,12 +154,13 @@ def extract_callsigns(summary: str, description: str) -> tuple[str, list[str]]:
     else:
         place, token = summary, ""
 
-    calls: list[str] = []
-    for found in _AS_CALL.finditer(description):
-        candidate = found.group(1).upper().rstrip(".,;")
-        if is_full_call(candidate) and candidate not in calls:
-            calls.append(candidate)
-    if token and is_full_call(token) and token not in calls:
+    calls = _calls_after_as(description)
+    if (
+        token
+        and is_full_call(token)
+        and token not in calls
+        and not _summary_is_only_a_prefix(token, calls)
+    ):
         calls.insert(0, token)
     return place, calls
 
