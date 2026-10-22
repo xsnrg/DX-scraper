@@ -553,7 +553,10 @@
                     'DX Cluster': (call) => `https://spothole.app/?text_includes=${encodeURIComponent(call)}`,
                     'HamQTH': (call) => `https://www.hamqth.com/${encodeURIComponent(call)}`,
                     'POTA': (call) => `https://pota.app/#/profile/${encodeURIComponent(call)}`,
-                    'NG3K': (call) => `https://www.ng3k.com/cgi-bin/adxo.pl?query=${encodeURIComponent(call)}`,
+                    // cgi-bin/adxo.pl (SWISH) returns 0 hits for every query.
+                    // adxoc.html is the working by-call list; the text fragment
+                    // highlights this call when it is on the page.
+                    'NG3K': (call) => `https://www.ng3k.com/Misc/adxoc.html#:~:text=${encodeURIComponent(call)}`,
                 };
 
                 const sourceUrl = (src, callsign) => {
